@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.8"
+$AppVersion = "1.9"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -1413,8 +1413,50 @@ function Start-NotebookBrowser {
             }
         }
 
-        # Fixed full-terminal layout: expands to fill full window height so interface never jumps
-        $boxHeight = [Math]::Max(10, $termHeight - 8)
+        # --- PRE-COMPUTE NAVBAR TO DETERMINE EXACT HEIGHT ---
+        $needsScrollBadge = ($previewLines.Count -gt ([Math]::Max(5, $termHeight - 10)))
+        
+        $navItems = @(
+            @("[W/S]", " Move "), @("[A/D]", " Folders ")
+        )
+        if ($needsScrollBadge) { $navItems += @( @("[J/K]", " Scroll ") ) }
+        $navItems += @( @("[T]", " Sort ") )
+
+        if ($activeItem -and $activeItem.Type -eq "Note") {
+            $navItems += @(
+                @("[Enter]", " View "),
+                @("[E]", " Edit "),
+                @("[O]", " Obsidian ")
+            )
+        } elseif ($activeItem -and $activeItem.Type -eq "Folder") {
+            $navItems += @( @("[Enter]", " Expand ") )
+        }
+
+        $navItems += @(
+            @("[N]", " Note "), @("[F]", " Folder "),
+            @("[V]", " What's New "), @("[R]", " Rename "),
+            @("[X]", " Del "), @("[Q]", " Exit")
+        )
+
+        $navBar = " "
+        $curLen = 1
+        $navLines = 1
+        foreach ($item in $navItems) {
+            $hotkey = $item[0]
+            $label = $item[1]
+            $itemLen = $hotkey.Length + $label.Length + 1
+            if ($curLen + $itemLen -gt $termWidth) {
+                $navBar += "`r`n "
+                $curLen = 1
+                $navLines++
+            }
+            $navBar += $cOrange + $hotkey + $cSilver + $label + " "
+            $curLen += $itemLen
+        }
+        $navBar += $rst + "$esc[J"
+
+        # Fixed full-terminal layout: dynamic box height based on actual navBar lines
+        $boxHeight = [Math]::Max(10, $termHeight - 5 - $navLines)
 
         if ($boxHeight -ne $script:lastBoxHeight -or $termWidth -ne $script:lastTermWidth) {
             $script:needsFullClear = $true
@@ -1591,24 +1633,7 @@ function Start-NotebookBrowser {
         # 4. Box Footer
         [void]$sb.AppendLine($cDarkGray + $bBotLeft + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $rightWidth) + $bBotRight + $rst)
 
-        # 5. Navigation Bar with Bright Orange Key Accents
-        $scrollBadge = ""
-        if ($previewLines.Count -gt $boxHeight) {
-            $scrollBadge = $cOrange + "[J/K]" + $cSilver + " Scroll  "
-        }
-        $navBar = " " + $cOrange + "[W/S]" + $cSilver + " Move  " + 
-                  $cOrange + "[A/D]" + $cSilver + " Folders  " + 
-                  $scrollBadge + 
-                  $cOrange + "[T]" + $cSilver + " Sort  " + 
-                  $cOrange + "[Enter]" + $cSilver + " View  " + 
-                  $cOrange + "[E]" + $cSilver + " Edit  " + 
-                  $cOrange + "[O]" + $cSilver + " Obsidian`r`n" + 
-                  " " + $cOrange + "[N]" + $cSilver + " Note  " + 
-                  $cOrange + "[F]" + $cSilver + " Folder  " + 
-                  $cOrange + "[V]" + $cSilver + " What's New  " + 
-                  $cOrange + "[R]" + $cSilver + " Rename  " + 
-                  $cOrange + "[X]" + $cSilver + " Del  " + 
-                  $cOrange + "[Q]" + $cSilver + " Exit" + $rst + "$esc[J"
+        # 5. Navigation Bar
         [void]$sb.Append($navBar)
 
         # 6. Atomic Write to Terminal (Zero-Flicker)
