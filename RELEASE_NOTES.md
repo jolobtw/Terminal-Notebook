@@ -53,3 +53,9 @@
 
 ### Bug Fixes
 - **Electron Log Bleed:** Fixed an issue where the Obsidian Electron app would inherit the terminal's standard output handles and dump its startup logs (e.g., auto-updater checks) directly into the Terminal Notes interface. We now explicitly use System.Diagnostics.ProcessStartInfo with ShellExecute to enforce complete background detachment.
+
+## Version 1.8
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Electron Log Bleed (Absolute Fix):** Fixed the persistent Obsidian text bleed issue by passing the command through a hidden cmd.exe /c start sub-process with fully trapped standard I/O streams. The Electron auto-updater logs can no longer reach the host terminal under any circumstances.

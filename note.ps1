@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.7"
+$AppVersion = "1.8"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -234,34 +234,22 @@ function Open-InObsidian {
     $relPath = $File.FullName.Substring($NotesDir.Length).TrimStart('\', '/').Replace('\', '/')
     $encodedFile = [System.Uri]::EscapeDataString($relPath)
     $uri = "obsidian://open?vault=$targetVault&file=$encodedFile"
-    function Detach-Process($path, $args) {
-        try {
-            $psi = New-Object System.Diagnostics.ProcessStartInfo
-            $psi.FileName = $path
-            if ($args) { $psi.Arguments = $args }
-            $psi.UseShellExecute = $true
-            $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Normal
-            [System.Diagnostics.Process]::Start($psi) | Out-Null
-        } catch {}
-    }
-
     try {
-        # Test if uri throws. In PWSH 7 UseShellExecute defaults to false.
         $psi = New-Object System.Diagnostics.ProcessStartInfo
-        $psi.FileName = $uri
-        $psi.UseShellExecute = $true
-        $p = [System.Diagnostics.Process]::Start($psi)
-        if ($null -eq $p) { throw "Fallback" }
-    } catch {
-        $obsidianExe = "$env:LOCALAPPDATA\Obsidian\Obsidian.exe"
-        if ($IsWindows -and (Test-Path $obsidianExe)) {
-            Detach-Process $obsidianExe "`"$($File.FullName)`""
-        } elseif ($IsWindows) {
-            Detach-Process "notepad.exe" "`"$($File.FullName)`""
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+
+        if ($IsWindows) {
+            $psi.FileName = "cmd.exe"
+            $psi.Arguments = "/c start `"`" `"$uri`""
         } else {
-            Detach-Process "open" "`"$($File.FullName)`""
+            $psi.FileName = "open"
+            $psi.Arguments = "`"$uri`""
         }
-    }
+        [System.Diagnostics.Process]::Start($psi) | Out-Null
+    } catch {}
 }
 
 function Invoke-TerminalEditor {
