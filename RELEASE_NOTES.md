@@ -35,3 +35,9 @@
 ### Features & Tweaks
 - **Read-Only Mode:** Added a -ReadOnly flag to the Fullscreen Reader.
 - **Release Notes Protection:** The in-app release notes viewer now correctly launches in Read-Only mode to prevent accidental edits.
+
+## Version 1.5
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Overflow:** Fixed an issue where opening a note in Obsidian directly from the navigation browser would print a success message to the bottom of the screen, causing the terminal window to shift upward and creating duplicate rows of the navigation bar. The Obsidian integration now launches silently in the background to prevent interface layout breaks.
