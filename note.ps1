@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.5"
+$AppVersion = "1.6"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -236,15 +236,15 @@ function Open-InObsidian {
     $uri = "obsidian://open?vault=$targetVault&file=$encodedFile"
 
     try {
-        Start-Process $uri
+        Start-Process $uri -ErrorAction Stop
     } catch {
         $obsidianExe = "$env:LOCALAPPDATA\Obsidian\Obsidian.exe"
         if ($IsWindows -and (Test-Path $obsidianExe)) {
-            Start-Process $obsidianExe -ArgumentList "`"$($File.FullName)`""
+            Start-Process $obsidianExe -ArgumentList "`"$($File.FullName)`"" -ErrorAction SilentlyContinue
         } elseif ($IsWindows) {
-            Start-Process notepad.exe -ArgumentList "`"$($File.FullName)`""
+            Start-Process notepad.exe -ArgumentList "`"$($File.FullName)`"" -ErrorAction SilentlyContinue
         } else {
-            Start-Process open -ArgumentList "`"$($File.FullName)`""
+            Start-Process open -ArgumentList "`"$($File.FullName)`"" -ErrorAction SilentlyContinue
         }
     }
 }
