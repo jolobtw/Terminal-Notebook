@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.1"
+$AppVersion = "1.2"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -1398,7 +1398,7 @@ function Start-NotebookBrowser {
         }
 
         # Fixed full-terminal layout: expands to fill full window height so interface never jumps
-        $boxHeight = [Math]::Max(10, $termHeight - 7)
+        $boxHeight = [Math]::Max(10, $termHeight - 8)
 
         if ($boxHeight -ne $script:lastBoxHeight -or $termWidth -ne $script:lastTermWidth) {
             $script:needsFullClear = $true
@@ -1586,8 +1586,8 @@ function Start-NotebookBrowser {
                   $cOrange + "[T]" + $cSilver + " Sort  " + 
                   $cOrange + "[Enter]" + $cSilver + " View  " + 
                   $cOrange + "[E]" + $cSilver + " Edit  " + 
-                  $cOrange + "[O]" + $cSilver + " Obsidian  " + 
-                  $cOrange + "[N]" + $cSilver + " Note  " + 
+                  $cOrange + "[O]" + $cSilver + " Obsidian`r`n" + 
+                  " " + $cOrange + "[N]" + $cSilver + " Note  " + 
                   $cOrange + "[F]" + $cSilver + " Folder  " + 
                   $cOrange + "[V]" + $cSilver + " What's New  " + 
                   $cOrange + "[R]" + $cSilver + " Rename  " + 
