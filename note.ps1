@@ -14,6 +14,8 @@ param(
     [string[]]$ArgsList
 )
 
+$AppVersion = "1.0"
+
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
@@ -1409,7 +1411,7 @@ function Start-NotebookBrowser {
         $sb = New-Object System.Text.StringBuilder
 
         # 1. Header Banner (Graphite to Flame Orange Horizon)
-        $starTitle = ".  *  +     TERMINAL NOTEBOOK     +  *  ."
+        $starTitle = ".  *  +     TERMINAL NOTEBOOK v$AppVersion     +  *  ."
         $starPad = " " * [Math]::Max(0, [int](($termWidth - $starTitle.Length) / 2))
         [void]$sb.AppendLine($starPad + (Render-GradientText $starTitle $gWaveDark $gWaveOrange))
 
@@ -1571,6 +1573,7 @@ function Start-NotebookBrowser {
                   $cOrange + "[O]" + $cSilver + " Obsidian  " + 
                   $cOrange + "[N]" + $cSilver + " Note  " + 
                   $cOrange + "[F]" + $cSilver + " Folder  " + 
+                  $cOrange + "[V]" + $cSilver + " What's New  " + 
                   $cOrange + "[R]" + $cSilver + " Rename  " + 
                   $cOrange + "[X]" + $cSilver + " Del  " + 
                   $cOrange + "[Q]" + $cSilver + " Exit" + $rst + "$esc[J"
@@ -1654,6 +1657,12 @@ function Start-NotebookBrowser {
                     } else {
                         Invoke-Modal { View-FullscreenNote (Get-Item $activeItem.FullName) }
                     }
+                }
+            }
+            "V" {
+                $releaseNotesPath = Join-Path $PSScriptRoot "RELEASE_NOTES.md"
+                if (Test-Path $releaseNotesPath) {
+                    Invoke-Modal { View-FullscreenNote -File (Get-Item $releaseNotesPath) }
                 }
             }
             "E" {
