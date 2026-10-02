@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.11"
+$AppVersion = "1.12"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -1478,8 +1478,8 @@ function Start-NotebookBrowser {
             $navBar += ("`r`n" * ($worstLines - $actualLines))
         }
 
-        # Fixed full-terminal layout: dynamic box height based on actual navBar lines
-        $boxHeight = [Math]::Max(5, $termHeight - 5 - $worstLines)
+        # Fixed full-terminal layout: dynamic box height based on actual navBar lines AND the 4-line top banner
+        $boxHeight = [Math]::Max(1, $termHeight - 9 - $worstLines)
 
         if ($boxHeight -ne $script:lastBoxHeight -or $termWidth -ne $script:lastTermWidth) {
             $script:needsFullClear = $true

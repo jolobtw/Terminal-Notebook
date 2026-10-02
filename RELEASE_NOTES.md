@@ -80,3 +80,9 @@
 
 ### Bug Fixes
 - **Console Word-Wrap Clipping:** Discovered an ultra-specific boundary edge case: if the dynamic navigation bar happened to calculate a length that perfectly matched your exact terminal width, the Windows Console would implicitly wrap the cursor to a phantom new line *before* our code explicitly wrapped it. This injected an invisible blank line into the UI, throwing off the pixel-perfect layout math, causing the terminal to scroll down by 1 line, which shoved the top title bar off the screen. Refactored the math to wrap at Width - 1 to strictly forbid implicit console wrapping.
+
+## Version 1.12
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **The Aurora Banner Overflow:** Discovered the actual root cause of the persistent terminal scrolling and clipping issues. When dynamically calculating the maximum terminal height for the main reading box, the logic completely forgot to subtract the physical height of the beautiful 4-line Aurora gradient banner introduced in 1.0. The UI bounding box was mathematically 4 lines too tall for the terminal, which forced it to constantly scroll and shove the top title bar completely off the screen! Fixed the box height subtraction engine to properly account for the banner.
