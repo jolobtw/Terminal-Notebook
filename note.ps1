@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.2"
+$AppVersion = "1.3"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -858,15 +858,20 @@ function Delete-ItemPrompt {
     param($Item)
     if (-not $Item -or -not (Test-Path $Item.FullName)) { return }
 
+    Clear-Host
+    Write-Host "==================================================" -ForegroundColor Red
+    Write-Host "                   DELETE ITEM                    " -ForegroundColor Red
+    Write-Host "==================================================" -ForegroundColor Red
+    Write-Host ""
+
     if ($Item.Type -eq "Folder") {
-        Write-Host ""
         $childFiles = Get-ChildItem -Path $Item.FullName -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue
         if ($childFiles -and $childFiles.Count -gt 0) {
             Write-Host " [!] WARNING: Folder '$($Item.Name)' contains $($childFiles.Count) note(s)!" -ForegroundColor Yellow -BackgroundColor DarkRed
-            Write-Host " Are you SURE you want to delete this folder and ALL its notes? (y/N): " -ForegroundColor Red -NoNewline
+            Write-Host "`n Are you SURE you want to delete this folder and ALL its notes? (y/N): " -ForegroundColor Red -NoNewline
         } else {
             Write-Host " [!] DELETE EMPTY FOLDER: '$($Item.Name)'" -ForegroundColor Yellow -BackgroundColor DarkRed
-            Write-Host " Are you sure you want to delete this empty folder? (y/N): " -ForegroundColor Red -NoNewline
+            Write-Host "`n Are you sure you want to delete this empty folder? (y/N): " -ForegroundColor Red -NoNewline
         }
 
         $confirm = Read-Host
@@ -875,23 +880,22 @@ function Delete-ItemPrompt {
             if ($script:ExpandedFolders.ContainsKey($Item.FullName)) {
                 $script:ExpandedFolders.Remove($Item.FullName)
             }
-            Write-Host " Folder deleted: $($Item.Name)" -ForegroundColor Yellow
+            Write-Host "`n Folder deleted: $($Item.Name)" -ForegroundColor Yellow
             Start-Sleep -Milliseconds 600
         } else {
-            Write-Host " Deletion cancelled." -ForegroundColor DarkGray
+            Write-Host "`n Deletion cancelled." -ForegroundColor DarkGray
             Start-Sleep -Milliseconds 400
         }
     } else {
-        Write-Host ""
         Write-Host " [!] DELETE NOTE: '$($Item.FileName)'" -ForegroundColor Yellow -BackgroundColor DarkRed
-        Write-Host " Are you sure you want to delete this note? (y/N): " -ForegroundColor Red -NoNewline
+        Write-Host "`n Are you sure you want to delete this note? (y/N): " -ForegroundColor Red -NoNewline
         $confirm = Read-Host
         if ($confirm.Trim().ToLower() -in @("y", "yes")) {
             Remove-Item -Path $Item.FullName -Force
-            Write-Host " Note deleted: $($Item.FileName)" -ForegroundColor Yellow
+            Write-Host "`n Note deleted: $($Item.FileName)" -ForegroundColor Yellow
             Start-Sleep -Milliseconds 600
         } else {
-            Write-Host " Deletion cancelled." -ForegroundColor DarkGray
+            Write-Host "`n Deletion cancelled." -ForegroundColor DarkGray
             Start-Sleep -Milliseconds 400
         }
     }

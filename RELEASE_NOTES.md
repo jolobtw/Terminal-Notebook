@@ -22,3 +22,9 @@
 
 ### Bug Fixes
 - **UI Flickering:** Fixed an issue where the new navigation hotkeys caused the footer bar to exceed standard terminal widths, wrapping to a new line and triggering a scrolling flicker. The hotkeys are now cleanly organized across two lines, and the layout engine perfectly compensates for the height.
+
+## Version 1.3
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Overflow:** Fixed an issue where the delete confirmation prompt didn't clear the screen before appearing, causing the main browser UI to be pushed upward and off the screen. The delete prompt now launches cleanly in a fullscreen modal view matching the rest of the application's style.
