@@ -86,3 +86,9 @@
 
 ### Bug Fixes
 - **The Aurora Banner Overflow:** Discovered the actual root cause of the persistent terminal scrolling and clipping issues. When dynamically calculating the maximum terminal height for the main reading box, the logic completely forgot to subtract the physical height of the beautiful 4-line Aurora gradient banner introduced in 1.0. The UI bounding box was mathematically 4 lines too tall for the terminal, which forced it to constantly scroll and shove the top title bar completely off the screen! Fixed the box height subtraction engine to properly account for the banner.
+
+## Version 1.13
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Conflicting Keybinds:** Fixed a bug where returning from the Release Notes screen would automatically open File Explorer. The V key was originally bound to open the "Vault" in File Explorer, and when we re-assigned it to "What's New" (Release Notes), the old binding was never removed. Since PowerShell evaluates all matching conditions in a switch block, it was triggering both actions sequentially! Removed the old binding.

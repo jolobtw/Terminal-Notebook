@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.12"
+$AppVersion = "1.13"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -1822,7 +1822,7 @@ function Start-NotebookBrowser {
             "Oem2" { # '/' key
                 Invoke-Modal { Search-NotesPrompt }
             }
-            { $_ -in @("V", "B") } { # Open Notes folder in File Explorer (Vault / Browse)
+            "B" { # Open Notes folder in File Explorer (Browse)
                 Invoke-Item $NotesDir
             }
             "Escape" {
