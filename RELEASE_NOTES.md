@@ -28,3 +28,10 @@
 
 ### Bug Fixes
 - **UI Overflow:** Fixed an issue where the delete confirmation prompt didn't clear the screen before appearing, causing the main browser UI to be pushed upward and off the screen. The delete prompt now launches cleanly in a fullscreen modal view matching the rest of the application's style.
+
+## Version 1.4
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **Read-Only Mode:** Added a -ReadOnly flag to the Fullscreen Reader.
+- **Release Notes Protection:** The in-app release notes viewer now correctly launches in Read-Only mode to prevent accidental edits.

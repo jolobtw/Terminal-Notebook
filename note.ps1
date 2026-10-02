@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.3"
+$AppVersion = "1.4"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -1209,7 +1209,10 @@ function Edit-NoteFile {
 }
 
 function View-FullscreenNote {
-    param([System.IO.FileInfo]$File)
+    param(
+        [System.IO.FileInfo]$File,
+        [switch]$ReadOnly
+    )
     if (-not $File -or -not (Test-Path $File.FullName)) { return }
 
     $termW = 80
@@ -1222,7 +1225,8 @@ function View-FullscreenNote {
 
     Clear-Host
     Write-Host $borderLine -ForegroundColor DarkGray
-    Write-Host ($cOrange + " Fullscreen Reader: " + $rst + $cWhite + $File.Name + $rst)
+    $modeTag = if ($ReadOnly) { $cGray + " [Read-Only]" } else { "" }
+    Write-Host ($cOrange + " Fullscreen Reader: " + $rst + $cWhite + $File.Name + $modeTag + $rst)
     Write-Host (" Path: " + $cGray + $File.FullName + $rst)
     Write-Host $borderLine -ForegroundColor DarkGray
     Write-Host ""
@@ -1236,17 +1240,24 @@ function View-FullscreenNote {
     }
 
     Write-Host "`n$borderLine" -ForegroundColor DarkGray
-    Write-Host ($cOrange + " [E]" + $cSilver + " Edit  " + $cOrange + "[O]" + $cSilver + " Obsidian  " + $cOrange + "[P]" + $cSilver + " Append  " + $cGray + "[Any other key]" + $cSilver + " Return..." + $rst)
-    try {
-        $k = [Console]::ReadKey($true)
-        if ($k.Key -eq "E") {
-            Edit-NoteFile -File $File
-        } elseif ($k.Key -eq "O") {
-            Open-InObsidian -File $File
-        } elseif ($k.Key -in @("A", "P")) {
-            Append-ToNote -File $File
-        }
-    } catch {}
+    if ($ReadOnly) {
+        Write-Host ($cGray + " [Any key]" + $cSilver + " Return..." + $rst)
+        try {
+            [Console]::ReadKey($true) | Out-Null
+        } catch {}
+    } else {
+        Write-Host ($cOrange + " [E]" + $cSilver + " Edit  " + $cOrange + "[O]" + $cSilver + " Obsidian  " + $cOrange + "[P]" + $cSilver + " Append  " + $cGray + "[Any other key]" + $cSilver + " Return..." + $rst)
+        try {
+            $k = [Console]::ReadKey($true)
+            if ($k.Key -eq "E") {
+                Edit-NoteFile -File $File
+            } elseif ($k.Key -eq "O") {
+                Open-InObsidian -File $File
+            } elseif ($k.Key -in @("A", "P")) {
+                Append-ToNote -File $File
+            }
+        } catch {}
+    }
 }
 
 function Search-NotesPrompt {
@@ -1682,7 +1693,7 @@ function Start-NotebookBrowser {
             "V" {
                 $releaseNotesPath = Join-Path $PSScriptRoot "RELEASE_NOTES.md"
                 if (Test-Path $releaseNotesPath) {
-                    Invoke-Modal { View-FullscreenNote -File (Get-Item $releaseNotesPath) }
+                    Invoke-Modal { View-FullscreenNote -File (Get-Item $releaseNotesPath) -ReadOnly }
                 }
             }
             "E" {
