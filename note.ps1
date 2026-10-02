@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.9"
+$AppVersion = "1.10"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -1419,8 +1419,8 @@ function Start-NotebookBrowser {
         $navItems = @(
             @("[W/S]", " Move "), @("[A/D]", " Folders ")
         )
-        if ($needsScrollBadge) { $navItems += @( @("[J/K]", " Scroll ") ) }
-        $navItems += @( @("[T]", " Sort ") )
+        if ($needsScrollBadge) { $navItems += ,@("[J/K]", " Scroll ") }
+        $navItems += ,@("[T]", " Sort ")
 
         if ($activeItem -and $activeItem.Type -eq "Note") {
             $navItems += @(
@@ -1429,7 +1429,7 @@ function Start-NotebookBrowser {
                 @("[O]", " Obsidian ")
             )
         } elseif ($activeItem -and $activeItem.Type -eq "Folder") {
-            $navItems += @( @("[Enter]", " Expand ") )
+            $navItems += ,@("[Enter]", " Expand ")
         }
 
         $navItems += @(
@@ -1438,9 +1438,27 @@ function Start-NotebookBrowser {
             @("[X]", " Del "), @("[Q]", " Exit")
         )
 
+        # Calculate worst-case nav lines to prevent UI bouncing/flickering
+        $worstItems = @(
+            @("[W/S]", " Move "), @("[A/D]", " Folders "), @("[J/K]", " Scroll "), @("[T]", " Sort "),
+            @("[Enter]", " View "), @("[E]", " Edit "), @("[O]", " Obsidian "),
+            @("[N]", " Note "), @("[F]", " Folder "), @("[V]", " What's New "),
+            @("[R]", " Rename "), @("[X]", " Del "), @("[Q]", " Exit")
+        )
+        $worstLen = 1
+        $worstLines = 1
+        foreach ($item in $worstItems) {
+            $itemLen = $item[0].Length + $item[1].Length + 1
+            if ($worstLen + $itemLen -gt $termWidth) {
+                $worstLen = 1
+                $worstLines++
+            }
+            $worstLen += $itemLen
+        }
+
         $navBar = " "
         $curLen = 1
-        $navLines = 1
+        $actualLines = 1
         foreach ($item in $navItems) {
             $hotkey = $item[0]
             $label = $item[1]
@@ -1448,15 +1466,20 @@ function Start-NotebookBrowser {
             if ($curLen + $itemLen -gt $termWidth) {
                 $navBar += "`r`n "
                 $curLen = 1
-                $navLines++
+                $actualLines++
             }
             $navBar += $cOrange + $hotkey + $cSilver + $label + " "
             $curLen += $itemLen
         }
         $navBar += $rst + "$esc[J"
 
+        # Pad with newlines so the navBar always occupies $worstLines height
+        if ($actualLines -lt $worstLines) {
+            $navBar += ("`r`n" * ($worstLines - $actualLines))
+        }
+
         # Fixed full-terminal layout: dynamic box height based on actual navBar lines
-        $boxHeight = [Math]::Max(10, $termHeight - 5 - $navLines)
+        $boxHeight = [Math]::Max(5, $termHeight - 5 - $worstLines)
 
         if ($boxHeight -ne $script:lastBoxHeight -or $termWidth -ne $script:lastTermWidth) {
             $script:needsFullClear = $true

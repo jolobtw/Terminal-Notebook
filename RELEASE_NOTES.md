@@ -66,3 +66,11 @@
 ### Features & Tweaks
 - **Context-Aware Navigation Bar:** The bottom navigation bar is now context-aware! Actions like [O] Obsidian, [E] Edit, and [Enter] View will only appear when you actually have a Note highlighted. When highlighting a Folder, the menu slims down and switches [Enter] to expand/collapse.
 - **Dynamic Responsive Layout:** Re-wrote the terminal height and UI rendering logic. The navigation bar now perfectly wraps and dynamically scales the height of the main interface based on your terminal's width, preventing any lingering ghost menus or scroll-tearing on narrower terminal windows.
+
+## Version 1.10
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Garbled Array Flattening:** Fixed a bug where PowerShell's array-flattening behavior caused single-item menu additions (like the folder Expand key) to be split into individual characters, drastically expanding the menu.
+- **Title Bar Overflow:** Re-tuned the height constraints (Max(5)) to prevent aggressive window resizing from causing the header to clip off the screen.
+- **Flicker-Free Navigation:** Implemented a static "worst-case" menu padder. The application now perfectly anticipates the maximum height the responsive menu *could* take and locks the UI box to that height. This completely eradicates all layout bouncing and flickering when navigating between folders and notes.
