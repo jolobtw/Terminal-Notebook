@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.13"
+$AppVersion = "1.14"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -221,6 +221,19 @@ function Register-ObsidianVault {
     } catch {
         return "Notes"
     }
+}
+
+function Render-HeaderBanner($width) {
+    $sb = New-Object System.Text.StringBuilder
+    $starTitle = ".  *  +     TERMINAL NOTEBOOK v$AppVersion     +  *  ."
+    $starPad = " " * [Math]::Max(0, [int](($width - $starTitle.Length) / 2))
+    [void]$sb.AppendLine($starPad + (Render-GradientText $starTitle $gWaveDark $gWaveOrange))
+
+    $barWidth = [Math]::Max(10, $width - 2)
+    [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2584)))
+    [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2588)))
+    [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2580)))
+    return $sb.ToString().TrimEnd()
 }
 
 function Open-InObsidian {
@@ -1225,6 +1238,8 @@ function View-FullscreenNote {
     $divLine    = "-" * [Math]::Min(120, $termW)
 
     Clear-Host
+    Write-Host (Render-HeaderBanner $termW)
+    Write-Host ""
     Write-Host $borderLine -ForegroundColor DarkGray
     $modeTag = if ($ReadOnly) { $cGray + " [Read-Only]" } else { "" }
     Write-Host ($cOrange + " Fullscreen Reader: " + $rst + $cWhite + $File.Name + $modeTag + $rst)
@@ -1241,13 +1256,21 @@ function View-FullscreenNote {
     }
 
     Write-Host "`n$borderLine" -ForegroundColor DarkGray
+    
+    # Standardized Footer Formatting
+    $footer = " "
     if ($ReadOnly) {
-        Write-Host ($cGray + " [Any key]" + $cSilver + " Return..." + $rst)
+        $footer += $cOrange + "[Any key]" + $cSilver + " Return..."
+        Write-Host ($footer + $rst)
         try {
             [Console]::ReadKey($true) | Out-Null
         } catch {}
     } else {
-        Write-Host ($cOrange + " [E]" + $cSilver + " Edit  " + $cOrange + "[O]" + $cSilver + " Obsidian  " + $cOrange + "[P]" + $cSilver + " Append  " + $cGray + "[Any other key]" + $cSilver + " Return..." + $rst)
+        $footer += $cOrange + "[E]" + $cSilver + " Edit  " + 
+                   $cOrange + "[O]" + $cSilver + " Obsidian  " + 
+                   $cOrange + "[P]" + $cSilver + " Append  " + 
+                   $cOrange + "[Any key]" + $cSilver + " Return..."
+        Write-Host ($footer + $rst)
         try {
             $k = [Console]::ReadKey($true)
             if ($k.Key -eq "E") {
@@ -1508,14 +1531,7 @@ function Start-NotebookBrowser {
         $sb = New-Object System.Text.StringBuilder
 
         # 1. Header Banner (Graphite to Flame Orange Horizon)
-        $starTitle = ".  *  +     TERMINAL NOTEBOOK v$AppVersion     +  *  ."
-        $starPad = " " * [Math]::Max(0, [int](($termWidth - $starTitle.Length) / 2))
-        [void]$sb.AppendLine($starPad + (Render-GradientText $starTitle $gWaveDark $gWaveOrange))
-
-        $barWidth = [Math]::Max(10, $termWidth - 2)
-        [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2584)))
-        [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2588)))
-        [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2580)))
+        [void]$sb.AppendLine((Render-HeaderBanner $termWidth))
 
         # 2. Box Header (100% Aligned Math)
         $sortTag = if ($script:SortMode -eq "alpha") { "A-Z" } else { "Date" }

@@ -92,3 +92,9 @@
 
 ### Bug Fixes
 - **Conflicting Keybinds:** Fixed a bug where returning from the Release Notes screen would automatically open File Explorer. The V key was originally bound to open the "Vault" in File Explorer, and when we re-assigned it to "What's New" (Release Notes), the old binding was never removed. Since PowerShell evaluates all matching conditions in a switch block, it was triggering both actions sequentially! Removed the old binding.
+
+## Version 1.14
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **UI Consistency:** The top "Terminal Notebook" Aurora gradient banner is now preserved and displayed when diving into the Fullscreen Reader mode (including the Release Notes viewer). The hotkey formatting in the reader mode has also been restyled to exactly match the look of the main application menu.
