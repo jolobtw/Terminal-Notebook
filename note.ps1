@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.0"
+$AppVersion = "1.1"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -439,18 +439,30 @@ function Convert-MarkdownToTerminalLines {
         }
 
         if ($frontmatterLines.Count -gt 0) {
-            $out += ($cDarkGray + " " + $uRoundTL + $uHoriz + " " + $cOrange + "Properties " + $cDarkGray + ($uHoriz * [Math]::Max(2, $Width - 17)) + $uRoundTR + $rst)
+            $titleStr = " Properties "
+            $dashes = [Math]::Max(2, $Width - 17)
+            $out += ($cDarkGray + " " + $uRoundTL + $uHoriz + $cOrange + $titleStr + $cDarkGray + ($uHoriz * $dashes) + $uRoundTR + $rst)
             foreach ($fl in $frontmatterLines) {
                 if ($fl -match '^\s*([A-Za-z0-9_-]+)\s*:\s*(.*)') {
                     $key = $matches[1]
                     $val = $matches[2].Trim('"', "'", ' ')
                     $valDisp = if ($val) { $val } else { "" }
-                    $out += ($cDarkGray + " " + $uVert + " " + $cGray + ("{0,-8}" -f $key) + $cDarkGray + ": " + $cWhite + (Format-MarkdownInline $valDisp) + $rst)
+                    if ($valDisp.Length -gt ($Width - 16)) { $valDisp = $valDisp.Substring(0, $Width - 19) + "..." }
+                    $keyPad = "{0,-8}" -f $key
+                    $contentLen = 13 + $valDisp.Length
+                    $padLen = [Math]::Max(0, $Width - 2 - $contentLen)
+                    $pad = " " * $padLen
+                    $out += ($cDarkGray + " " + $uVert + " " + $cGray + $keyPad + $cDarkGray + ": " + $cWhite + (Format-MarkdownInline $valDisp) + $pad + $cDarkGray + $uVert + $rst)
                 } elseif ($fl -match '^\s*-\s+(.*)') {
-                    $out += ($cDarkGray + " " + $uVert + "   " + $cAmber + "$uBullet " + $cSilver + (Format-MarkdownInline $matches[1]) + $rst)
+                    $itemText = $matches[1]
+                    if ($itemText.Length -gt ($Width - 13)) { $itemText = $itemText.Substring(0, $Width - 16) + "..." }
+                    $contentLen = 7 + $itemText.Length
+                    $padLen = [Math]::Max(0, $Width - 2 - $contentLen)
+                    $pad = " " * $padLen
+                    $out += ($cDarkGray + " " + $uVert + "   " + $cAmber + "$uBullet " + $cSilver + (Format-MarkdownInline $itemText) + $pad + $cDarkGray + $uVert + $rst)
                 }
             }
-            $out += ($cDarkGray + " " + $uRoundBL + ($uHoriz * [Math]::Max(2, $Width - 3)) + $uRoundBR + $rst)
+            $out += ($cDarkGray + " " + $uRoundBL + ($uHoriz * [Math]::Max(2, $Width - 4)) + $uRoundBR + $rst)
             $out += ""
         }
     }
@@ -467,20 +479,24 @@ function Convert-MarkdownToTerminalLines {
                 $inCodeBlock = $true
                 $codeLang = $matches[1]
                 $tag = if ($codeLang) { " $codeLang " } else { " Code " }
-                $out += ($cDarkGray + " " + $uRoundTL + $uHoriz + $cOrange + $tag + $cDarkGray + ($uHoriz * [Math]::Max(2, $Width - $tag.Length - 5)) + $uRoundTR + $rst)
+                $dashes = [Math]::Max(2, $Width - 5 - $tag.Length)
+                $out += ($cDarkGray + " " + $uRoundTL + $uHoriz + $cOrange + $tag + $cDarkGray + ($uHoriz * $dashes) + $uRoundTR + $rst)
             } else {
                 $inCodeBlock = $false
-                $out += ($cDarkGray + " " + $uRoundBL + ($uHoriz * [Math]::Max(2, $Width - 3)) + $uRoundBR + $rst)
+                $out += ($cDarkGray + " " + $uRoundBL + ($uHoriz * [Math]::Max(2, $Width - 4)) + $uRoundBR + $rst)
             }
             continue
         }
 
         if ($inCodeBlock) {
             $codeStr = $line
-            if ($codeStr.Length -gt ($Width - 4)) {
-                $codeStr = $codeStr.Substring(0, $Width - 4)
+            if ($codeStr.Length -gt ($Width - 6)) {
+                $codeStr = $codeStr.Substring(0, $Width - 6)
             }
-            $out += ($cDarkGray + " " + $uVert + " " + $cAmber + $codeStr + $rst)
+            $contentLen = 3 + $codeStr.Length
+            $padLen = [Math]::Max(0, $Width - 2 - $contentLen)
+            $pad = " " * $padLen
+            $out += ($cDarkGray + " " + $uVert + " " + $cAmber + $codeStr + $pad + $cDarkGray + $uVert + $rst)
             continue
         }
 

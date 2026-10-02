@@ -10,3 +10,9 @@
 - **Obsidian Integration:** Launch and edit notes directly inside Obsidian or preferred terminal editors (`micro`, `nvim`, `nano`).
 - **Quick Logging:** Rapid text entry mode directly inside the terminal without needing to boot up a full editor.
 - **Flicker-Free Rendering:** Optimized double-buffered screen rendering to prevent UI flashing during navigation.
+
+## Version 1.1
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Rendering:** Fixed a visual bug where the right-hand border was missing from Markdown Properties blocks and Fenced Code blocks. They now dynamically scale and draw their right borders correctly based on terminal width.
