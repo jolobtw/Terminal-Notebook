@@ -74,3 +74,9 @@
 - **Garbled Array Flattening:** Fixed a bug where PowerShell's array-flattening behavior caused single-item menu additions (like the folder Expand key) to be split into individual characters, drastically expanding the menu.
 - **Title Bar Overflow:** Re-tuned the height constraints (Max(5)) to prevent aggressive window resizing from causing the header to clip off the screen.
 - **Flicker-Free Navigation:** Implemented a static "worst-case" menu padder. The application now perfectly anticipates the maximum height the responsive menu *could* take and locks the UI box to that height. This completely eradicates all layout bouncing and flickering when navigating between folders and notes.
+
+## Version 1.11
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Console Word-Wrap Clipping:** Discovered an ultra-specific boundary edge case: if the dynamic navigation bar happened to calculate a length that perfectly matched your exact terminal width, the Windows Console would implicitly wrap the cursor to a phantom new line *before* our code explicitly wrapped it. This injected an invisible blank line into the UI, throwing off the pixel-perfect layout math, causing the terminal to scroll down by 1 line, which shoved the top title bar off the screen. Refactored the math to wrap at Width - 1 to strictly forbid implicit console wrapping.

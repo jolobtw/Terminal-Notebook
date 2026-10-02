@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.10"
+$AppVersion = "1.11"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -1441,7 +1441,7 @@ function Start-NotebookBrowser {
         # Calculate worst-case nav lines to prevent UI bouncing/flickering
         $worstItems = @(
             @("[W/S]", " Move "), @("[A/D]", " Folders "), @("[J/K]", " Scroll "), @("[T]", " Sort "),
-            @("[Enter]", " View "), @("[E]", " Edit "), @("[O]", " Obsidian "),
+            @("[Enter]", " Expand "), @("[Enter]", " View "), @("[E]", " Edit "), @("[O]", " Obsidian "),
             @("[N]", " Note "), @("[F]", " Folder "), @("[V]", " What's New "),
             @("[R]", " Rename "), @("[X]", " Del "), @("[Q]", " Exit")
         )
@@ -1449,7 +1449,7 @@ function Start-NotebookBrowser {
         $worstLines = 1
         foreach ($item in $worstItems) {
             $itemLen = $item[0].Length + $item[1].Length + 1
-            if ($worstLen + $itemLen -gt $termWidth) {
+            if ($worstLen + $itemLen -ge $termWidth) {
                 $worstLen = 1
                 $worstLines++
             }
@@ -1463,7 +1463,7 @@ function Start-NotebookBrowser {
             $hotkey = $item[0]
             $label = $item[1]
             $itemLen = $hotkey.Length + $label.Length + 1
-            if ($curLen + $itemLen -gt $termWidth) {
+            if ($curLen + $itemLen -ge $termWidth) {
                 $navBar += "`r`n "
                 $curLen = 1
                 $actualLines++
