@@ -47,3 +47,9 @@
 
 ### Bug Fixes
 - **UI Overflow:** Fixed a persistent issue where opening a note in Obsidian without a properly registered protocol handler caused a native PowerShell error stream to dump into the console, breaking the UI layout and leaving duplicate ghost menus. The launch command now properly swallows non-terminating errors.
+
+## Version 1.7
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Electron Log Bleed:** Fixed an issue where the Obsidian Electron app would inherit the terminal's standard output handles and dump its startup logs (e.g., auto-updater checks) directly into the Terminal Notes interface. We now explicitly use System.Diagnostics.ProcessStartInfo with ShellExecute to enforce complete background detachment.

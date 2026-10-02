@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.6"
+$AppVersion = "1.7"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -234,17 +234,32 @@ function Open-InObsidian {
     $relPath = $File.FullName.Substring($NotesDir.Length).TrimStart('\', '/').Replace('\', '/')
     $encodedFile = [System.Uri]::EscapeDataString($relPath)
     $uri = "obsidian://open?vault=$targetVault&file=$encodedFile"
+    function Detach-Process($path, $args) {
+        try {
+            $psi = New-Object System.Diagnostics.ProcessStartInfo
+            $psi.FileName = $path
+            if ($args) { $psi.Arguments = $args }
+            $psi.UseShellExecute = $true
+            $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Normal
+            [System.Diagnostics.Process]::Start($psi) | Out-Null
+        } catch {}
+    }
 
     try {
-        Start-Process $uri -ErrorAction Stop
+        # Test if uri throws. In PWSH 7 UseShellExecute defaults to false.
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $uri
+        $psi.UseShellExecute = $true
+        $p = [System.Diagnostics.Process]::Start($psi)
+        if ($null -eq $p) { throw "Fallback" }
     } catch {
         $obsidianExe = "$env:LOCALAPPDATA\Obsidian\Obsidian.exe"
         if ($IsWindows -and (Test-Path $obsidianExe)) {
-            Start-Process $obsidianExe -ArgumentList "`"$($File.FullName)`"" -ErrorAction SilentlyContinue
+            Detach-Process $obsidianExe "`"$($File.FullName)`""
         } elseif ($IsWindows) {
-            Start-Process notepad.exe -ArgumentList "`"$($File.FullName)`"" -ErrorAction SilentlyContinue
+            Detach-Process "notepad.exe" "`"$($File.FullName)`""
         } else {
-            Start-Process open -ArgumentList "`"$($File.FullName)`"" -ErrorAction SilentlyContinue
+            Detach-Process "open" "`"$($File.FullName)`""
         }
     }
 }
