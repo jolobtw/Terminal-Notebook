@@ -1,5 +1,12 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.2
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Editor Stale PATH Errors:** Fixed a major bug where Windows Terminal would fail to find the newly installed `hx` (or `micro`) executable and throw `error 2147942402 (0x80070002)`. Because the background `wt.exe` process evaluates commands using a stale `PATH` cache, the `Start-Process` launch command has been refactored to always pass the *absolute* path of the resolved terminal editor.
+- **Start-Process Quoting:** Fixed an issue where editor paths and file paths containing spaces were not safely quoted when passed as a raw string to the Windows Terminal CLI.
+
 ## Version 2.6.1
 **Date:** 2026-10-02
 

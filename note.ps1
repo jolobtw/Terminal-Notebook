@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.1"
+$AppVersion = "2.6.2"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -157,36 +157,32 @@ if (-not $script:SortMode) {
 }
 
 function Get-PreferredTerminalEditor {
-    if (Get-Command hx -ErrorAction SilentlyContinue) {
-        return "hx"
-    }
+    $hxCmd = Get-Command hx -ErrorAction SilentlyContinue
+    if ($hxCmd -and $hxCmd.Definition) { return $hxCmd.Definition }
     if ($IsWindows) {
         $hxWinGet = Resolve-Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Helix.Helix*\*\hx.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($hxWinGet) {
-            return $hxWinGet.Path
-        }
+        if ($hxWinGet) { return $hxWinGet.Path }
     }
-    if (Get-Command micro -ErrorAction SilentlyContinue) {
-        return "micro"
-    }
+    
+    $microCmd = Get-Command micro -ErrorAction SilentlyContinue
+    if ($microCmd -and $microCmd.Definition) { return $microCmd.Definition }
     if ($IsWindows) {
         $microWinGet = Resolve-Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\zyedidia.micro*\*\micro.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($microWinGet) {
-            return $microWinGet.Path
-        }
+        if ($microWinGet) { return $microWinGet.Path }
     }
-    if (Get-Command nvim -ErrorAction SilentlyContinue) {
-        return "nvim"
-    }
+    
+    $nvimCmd = Get-Command nvim -ErrorAction SilentlyContinue
+    if ($nvimCmd -and $nvimCmd.Definition) { return $nvimCmd.Definition }
     if ($IsWindows -and (Test-Path "C:\Program Files\Neovim\bin\nvim.exe")) {
         return "C:\Program Files\Neovim\bin\nvim.exe"
     }
-    if (Get-Command nano -ErrorAction SilentlyContinue) {
-        return "nano"
-    }
-    if (Get-Command vim -ErrorAction SilentlyContinue) {
-        return "vim"
-    }
+    
+    $nanoCmd = Get-Command nano -ErrorAction SilentlyContinue
+    if ($nanoCmd -and $nanoCmd.Definition) { return $nanoCmd.Definition }
+    
+    $vimCmd = Get-Command vim -ErrorAction SilentlyContinue
+    if ($vimCmd -and $vimCmd.Definition) { return $vimCmd.Definition }
+    
     return $null
 }
 
@@ -299,8 +295,11 @@ function Invoke-TerminalEditor {
     # Version 2.0: Windows Terminal Seamless Split-Pane Editing
     if ($env:WT_SESSION) {
         # We are inside modern Windows Terminal. Split the pane vertically so the user keeps the tree visible!
-        $wtArgs = @("-w", "0", "split-pane", "-V", $EditorPath) + $edArgs
-        Start-Process -FilePath "wt.exe" -ArgumentList $wtArgs
+        
+        # Manually quote arguments that contain spaces to safely pass the string to Windows Terminal
+        $safeArgs = $edArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }
+        $wtArgsString = "-w 0 split-pane -V `"$EditorPath`" " + ($safeArgs -join " ")
+        Start-Process -FilePath "wt.exe" -ArgumentList $wtArgsString
         
         # Sleep to allow Windows Terminal to complete the PTY split and resize event.
         # This prevents the Notebook Browser from re-rendering the UI with the old full width,
