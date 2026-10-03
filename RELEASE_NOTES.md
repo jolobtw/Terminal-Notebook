@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.0.5
+**Date:** 2026-10-03
+
+### Bug Fixes & Visual Polish
+- **Text Entry Row Inner & Outer Border Alignment:** Eliminated mid-line ANSI reset codes (`$rst`) inside the input modal's text field row (`Show-InlineInputModal`). Mid-line resets were causing terminal color transitions to shift character boundaries, making the inner text box border (`│`) and outer card border (`│`) appear offset by a space on text entry lines.
+- **Clean Background State Transitions:** Streamlined color attribute switching (`$cCardBg` -> `$cInputBg` -> `$cCardBg`) without intermediary resets, guaranteeing 100% pixel-perfect vertical alignment for all inner input box borders and outer modal card borders.
+
 ## Version 3.0.4
 **Date:** 2026-10-03
 

@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.0.4"
+$AppVersion = "3.0.5"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -438,7 +438,12 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
             $modalStr = $ModalLines[$mIdx]
             $modalVisLen = ($AnsiRegex.Replace($modalStr, '')).Length
             if ($modalVisLen -lt $mw) {
-                $modalStr = $modalStr.TrimEnd() + (" " * ($mw - $modalVisLen))
+                $padSpace = " " * ($mw - $modalVisLen)
+                if ($modalStr.EndsWith($rst)) {
+                    $modalStr = $modalStr.Substring(0, $modalStr.Length - $rst.Length) + $padSpace + $rst
+                } else {
+                    $modalStr += $padSpace
+                }
             } elseif ($modalVisLen -gt $mw) {
                 $modalStr = Limit-AnsiText $modalStr $mw
             }
@@ -503,6 +508,7 @@ function Show-InlineInputModal {
         $topBorderColor = fg 255 140 30
         $botBorderColor = fg 255 140 30
         $cardVBar = (fg 255 140 30) + $bVert
+        $innerVBar = (fg 95 100 115) + $bVert
 
         $modalLines = [System.Collections.Generic.List[string]]::new()
         $modalLines.Add($cCardBg + $topBorderColor + $uRoundTL + $bHoriz + $cOrange + $headerTitle + $topBorderColor + ($bHoriz * $dashRight) + $uRoundTR + $rst)
@@ -520,10 +526,9 @@ function Show-InlineInputModal {
 
         $modalLines.Add($cCardBg + $cardVBar + "  " + $cDarkGray + $uRoundTL + ($bHoriz * ($innerW + 2)) + $uRoundTR + $cCardBg + "  " + $cardVBar + $rst)
 
-        $inputText = $dispInput + "$cOrange_$rst$cInputBg"
         $inputVisibleLen = $dispInput.Length + 1
         $inputPad = " " * [Math]::Max(0, $innerW - $inputVisibleLen)
-        $modalLines.Add($cCardBg + $cardVBar + "  " + $cDarkGray + $bVert + $cInputBg + " " + $cWhite + $inputText + $inputPad + " " + $rst + $cCardBg + $cDarkGray + $bVert + "  " + $cardVBar + $rst)
+        $modalLines.Add($cCardBg + $cardVBar + "  " + $innerVBar + $cInputBg + " " + $cWhite + $dispInput + $cOrange + "_" + $cInputBg + $inputPad + " " + $cCardBg + $innerVBar + $cCardBg + "  " + $cardVBar + $rst)
 
         $modalLines.Add($cCardBg + $cardVBar + "  " + $cDarkGray + $uRoundBL + ($bHoriz * ($innerW + 2)) + $uRoundBR + $cCardBg + "  " + $cardVBar + $rst)
 
