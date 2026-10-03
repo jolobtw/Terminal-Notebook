@@ -34,19 +34,106 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 ## 🚀 Installation & Setup
 
 ### Prerequisites
-* **PowerShell**: 
-  * **Windows:** Included by default (PowerShell 5.1+ supported).
-  * **macOS:** Requires PowerShell Core (`brew install --cask powershell`).
-* **Nerd Fonts:** Ensure your terminal uses a Nerd Font for folder and file icons to render correctly.
-* **Terminal Editor:** I highly recommend installing [Helix](https://helix-editor.com/) (`winget install helix`) or [Micro](https://micro-editor.github.io/) for the best in-terminal editing experience.
 
-### Setup
-1. Clone this repository or download the `note.ps1` script to your system.
-2. Open your PowerShell profile (`notepad $PROFILE`).
-3. Add the following alias so you can launch the app from anywhere:
+* **PowerShell:**
+  * **Windows:** Pre-installed (PowerShell 5.1+ supported, PowerShell 7+ recommended: `winget install Microsoft.PowerShell`).
+  * **macOS:** Install PowerShell Core via Homebrew:
+    ```bash
+    brew install --cask powershell
+    ```
+* **Nerd Fonts:** Set your terminal font to any [Nerd Font](https://www.nerdfonts.com/) (e.g., *FiraCode Nerd Font*, *CaskaydiaCove Nerd Font*, or *MesloLGS NF*) for folder, file, and tree icons to render correctly.
+* **Terminal Editor (Recommended):** Install a fast terminal editor like [Helix](https://helix-editor.com/) or [Micro]:
+  * **Windows:** `winget install Helix.Helix`
+  * **macOS:** `brew install helix`
+
+---
+
+### 📦 Installation & Setup
+
+#### 1. Clone the Repository
+Clone the repository to a folder on your system:
+```bash
+git clone https://github.com/jolobtw/Terminal-Notebook.git ~/Terminal-Notebook
+```
+
+#### 2. Create the `note` Alias for Your Shell
+
+Select the instructions below for your operating system and preferred shell:
+
+##### 🪟 Windows — PowerShell
+1. Open your PowerShell profile in a text editor:
    ```powershell
-   Set-Alias -Name note -Value "C:\path\to\terminal-notebook\note.ps1"
+   notepad $PROFILE
    ```
+   *(If the file doesn't exist, create it with `New-Item -Type File -Path $PROFILE -Force`)*
+
+2. Add the alias pointing to your `note.ps1` path:
+   ```powershell
+   Set-Alias -Name note -Value "C:\Path\To\Terminal-Notebook\note.ps1"
+   ```
+
+3. Reload your profile:
+   ```powershell
+   . $PROFILE
+   ```
+
+---
+
+##### 🍎 macOS — zsh (Default macOS Shell)
+1. Open your `~/.zshrc` file:
+   ```bash
+   nano ~/.zshrc
+   ```
+
+2. Add an alias that executes `note.ps1` using PowerShell (`pwsh`):
+   ```bash
+   alias note="pwsh -File $HOME/Terminal-Notebook/note.ps1"
+   ```
+
+3. Save, exit, and apply changes:
+   ```bash
+   source ~/.zshrc
+   ```
+
+---
+
+##### 🍎 macOS / 🐧 Linux — PowerShell Core (`pwsh`)
+If you use PowerShell as your primary shell on macOS or Linux:
+1. Open your PowerShell profile:
+   ```powershell
+   pwsh -Command "notepad \$PROFILE"   # or nano ~/.config/powershell/Microsoft.PowerShell_profile.ps1
+   ```
+
+2. Add the alias:
+   ```powershell
+   Set-Alias -Name note -Value "$HOME/Terminal-Notebook/note.ps1"
+   ```
+
+3. Reload profile:
+   ```powershell
+   . $PROFILE
+   ```
+
+---
+
+##### 🐧 Linux / 🍎 macOS — bash or fish
+* **For bash (`~/.bashrc`):**
+  ```bash
+  alias note="pwsh -File $HOME/Terminal-Notebook/note.ps1"
+  ```
+* **For fish (`~/.config/fish/config.fish`):**
+  ```fish
+  alias note="pwsh -File $HOME/Terminal-Notebook/note.ps1"
+  ```
+
+---
+
+#### 3. Launch Terminal Notebook!
+Type `note` in your shell to open the interactive Notebook Browser:
+```bash
+note
+```
+*(On first launch, Terminal Notebook will automatically initialize your default workspace at `~/Notes` if one doesn't exist yet.)*
 
 ---
 
