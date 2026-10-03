@@ -8,7 +8,14 @@
 - **Interactive Workspace Switcher:** Press **`[B]`** inside the Notebook Browser to open the interactive workspace switcher modal to pick, add, or remove notebook folders.
 - **CLI Workspace Parameters & Profile Aliases:** Launch directly into a named workspace or folder path via `note work`, `note -Path ~/WorkNotes`, or manage profiles using `note notebook list|switch|add|remove`.
 - **Persistent Global Configuration:** Registered notebook workspace profiles and the active notebook directory persist globally in `~/.terminal_notebook.json`.
-- **UI Workspace Indicator:** The header banner and tree view box header now dynamically display the active workspace name (e.g. `[Work]`).
+- **UI Workspace Indicator:** The tree view box header now dynamically displays the active workspace name (e.g. `WORKSPACE: Notes`).
+
+## Version 2.7.0
+**Date:** 2026-10-02
+
+### Branding & Reorganization
+- **Terminal Notebook Rebranding:** Unified application naming to Terminal Notebook across all scripts, banners, documentation, CLI parameters, and config files.
+- **Documentation Overhaul:** Updated README.md with high-resolution UI screenshots, streamlined installation guides, and full keyboard shortcut references.
 
 ## Version 2.6.11
 **Date:** 2026-10-02
