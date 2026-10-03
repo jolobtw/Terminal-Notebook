@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.8"
+$AppVersion = "2.6.9"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1685,16 +1685,29 @@ function Start-NotebookBrowser {
 
         switch ($key.Key) {
             { $_ -in @("UpArrow", "W") } {
-                if ($selectedIndex -gt 0) { $selectedIndex-- }
+                if ($selectedIndex -gt 0) { 
+                    $selectedIndex-- 
+                    if ($treeItems[$selectedIndex].Type -eq "Spacer" -and $selectedIndex -gt 0) {
+                        $selectedIndex--
+                    }
+                }
             }
             { $_ -in @("DownArrow", "S") } {
-                if ($selectedIndex -lt ($treeItems.Count - 1)) { $selectedIndex++ }
+                if ($selectedIndex -lt ($treeItems.Count - 1)) { 
+                    $selectedIndex++ 
+                    if ($treeItems[$selectedIndex].Type -eq "Spacer" -and $selectedIndex -lt ($treeItems.Count - 1)) {
+                        $selectedIndex++
+                    }
+                }
             }
             "PageUp" {
                 if ($previewLines.Count -gt $boxHeight) {
                     $previewScrollOffset = [Math]::Max(0, $previewScrollOffset - [Math]::Max(1, $boxHeight - 3))
                 } else {
                     $selectedIndex = [Math]::Max(0, $selectedIndex - 6)
+                    if ($treeItems[$selectedIndex].Type -eq "Spacer") {
+                        if ($selectedIndex -gt 0) { $selectedIndex-- } else { $selectedIndex++ }
+                    }
                 }
             }
             "PageDown" {
@@ -1702,6 +1715,9 @@ function Start-NotebookBrowser {
                     $previewScrollOffset = [Math]::Min($maxPreviewScroll, $previewScrollOffset + [Math]::Max(1, $boxHeight - 3))
                 } else {
                     $selectedIndex = [Math]::Min([Math]::Max(0, $treeItems.Count - 1), $selectedIndex + 6)
+                    if ($treeItems[$selectedIndex].Type -eq "Spacer") {
+                        if ($selectedIndex -lt ($treeItems.Count - 1)) { $selectedIndex++ } else { $selectedIndex-- }
+                    }
                 }
             }
             "J" {

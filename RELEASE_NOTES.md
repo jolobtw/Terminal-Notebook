@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.9
+**Date:** 2026-10-02
+
+### UI Tweaks
+- **Frictionless Spacer Navigation:** The UI layout engine's folder "Spacer" (which visually separates root folders from root notes) is no longer a navigable element in the list. Pressing up, down, page-up, or page-down will automatically jump cleanly over the spacer, removing the extra keystroke required to traverse the boundary.
+
 ## Version 2.6.8
 **Date:** 2026-10-02
 
