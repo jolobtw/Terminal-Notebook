@@ -40,7 +40,7 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
   * **Windows:** Included by default (PowerShell 5.1+ supported).
   * **macOS:** Requires PowerShell Core (`brew install --cask powershell`).
 * **Nerd Fonts:** Ensure your terminal uses a Nerd Font for folder and file icons to render correctly.
-* **Terminal Editor:** We highly recommend installing [Helix](https://helix-editor.com/) (`winget install helix`) or [Micro](https://micro-editor.github.io/) for the best in-terminal editing experience.
+* **Terminal Editor:** I highly recommend installing [Helix](https://helix-editor.com/) (`winget install helix`) or [Micro](https://micro-editor.github.io/) for the best in-terminal editing experience.
 
 ### Setup
 1. Clone this repository or download the `note.ps1` script to your system.

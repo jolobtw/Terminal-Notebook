@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.12
+**Date:** 2026-10-02
+
+### Documentation
+- **Tone Adjustment:** Removed pluralized corporate formatting ("We") from the README in favor of a more personal tone ("I").
+
 ## Version 2.6.11
 **Date:** 2026-10-02
 
