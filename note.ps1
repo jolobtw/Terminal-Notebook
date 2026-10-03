@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.1"
+$AppVersion = "3.4.0"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -2004,7 +2004,6 @@ function View-FullscreenNote {
 
         # Assemble the whole frame in memory, then write it in one go (no flicker)
         $sb = [System.Text.StringBuilder]::new()
-        [void]$sb.AppendLine((Render-HeaderBanner $termWidth))
 
         # Outer Box Gradient Colors (Slate Gray -> Vivid Flame Orange)
         $cBorderStart = @(95, 100, 115)
@@ -2012,6 +2011,19 @@ function View-FullscreenNote {
         $topBorderColor = fg $cBorderStart[0] $cBorderStart[1] $cBorderStart[2]
         $botBorderColor = fg $cBorderEnd[0] $cBorderEnd[1] $cBorderEnd[2]
 
+        # 1. Top Outer Box Border
+        [void]$sb.AppendLine($topBorderColor + $bTopLeft + ($bHoriz * ($termWidth - 2)) + $bTopRight + $rst)
+
+        # 2. Integrated Top-Cap Header Banner Row
+        $titleText = " T E R M I N A L   N O T E B O O K "
+        $availTitleWidth = $termWidth - 2
+        $leftPadLen = [Math]::Max(0, [int](($availTitleWidth - $titleText.Length) / 2))
+        $rightPadLen = [Math]::Max(0, $availTitleWidth - $titleText.Length - $leftPadLen)
+        $vBarTop = $topBorderColor + $bVert + $rst
+        $gradTitle = Render-GradientText $titleText $gWaveOrange $gWaveAmber
+        [void]$sb.AppendLine($vBarTop + (" " * $leftPadLen) + $gradTitle + (" " * $rightPadLen) + $vBarTop)
+
+        # 3. Sub-Header Internal Divider Line
         $leftTitle = " FULLSCREEN READER: " + (Truncate-String $File.Name 40) + $modeTag
         $scrollNotice = ""
         if ($renderedLines.Count -gt $viewHeight) {
@@ -2025,7 +2037,9 @@ function View-FullscreenNote {
         }
         $headerDashes = [Math]::Max(0, $availWidth - $leftTitle.Length - $scrollNotice.Length)
 
-        [void]$sb.Append($topBorderColor + $uRoundTL + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $headerDashes) + $cAmber + $scrollNotice + $topBorderColor + $uRoundTR + $rst + "`r`n")
+        $bMidLeft  = $topBorderColor + $uMidLeft + $rst
+        $bMidRight = $topBorderColor + $uMidRight + $rst
+        [void]$sb.Append($bMidLeft + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $headerDashes) + $cAmber + $scrollNotice + $topBorderColor + $bMidRight + $rst + "`r`n")
 
         for ($r = 0; $r -lt $boxHeight; $r++) {
             $tRatio = ($r + 1) / ($boxHeight + 1.0)
@@ -2045,7 +2059,7 @@ function View-FullscreenNote {
         }
 
         # Box Footer Line
-        [void]$sb.AppendLine($botBorderColor + $uRoundBL + ($bHoriz * ($termWidth - 2)) + $uRoundBR + $rst)
+        [void]$sb.AppendLine($botBorderColor + $bBotLeft + ($bHoriz * ($termWidth - 2)) + $bBotRight + $rst)
 
         # Nav Legend
         [void]$sb.Append(" " + $footerKeys + $rst + "$esc[J")
@@ -2332,10 +2346,25 @@ function Start-NotebookBrowser {
             $renderFrameLines = {
                 $sb = [System.Text.StringBuilder]::new()
 
-                # 1. Header Banner (Graphite to Flame Orange Horizon)
-                [void]$sb.AppendLine((Render-HeaderBanner $termWidth))
+                # Outer Box Gradient Colors (Slate Graphite / Gray -> Vivid Flame Orange)
+                $cBorderStart = @(95, 100, 115)
+                $cBorderEnd   = @(255, 130, 0)
+                $topBorderColor = fg $cBorderStart[0] $cBorderStart[1] $cBorderStart[2]
+                $botBorderColor = fg $cBorderEnd[0] $cBorderEnd[1] $cBorderEnd[2]
 
-                # 2. Box Header (100% Aligned Math)
+                # 1. Top Outer Box Border (Row 0)
+                [void]$sb.AppendLine($topBorderColor + $bTopLeft + ($bHoriz * ($termWidth - 2)) + $bTopRight + $rst)
+
+                # 2. Integrated Top-Cap Header Banner Row (Row 1)
+                $titleText = " T E R M I N A L   N O T E B O O K "
+                $availTitleWidth = $termWidth - 2
+                $leftPadLen = [Math]::Max(0, [int](($availTitleWidth - $titleText.Length) / 2))
+                $rightPadLen = [Math]::Max(0, $availTitleWidth - $titleText.Length - $leftPadLen)
+                $vBarTop = $topBorderColor + $bVert + $rst
+                $gradTitle = Render-GradientText $titleText $gWaveOrange $gWaveAmber
+                [void]$sb.AppendLine($vBarTop + (" " * $leftPadLen) + $gradTitle + (" " * $rightPadLen) + $vBarTop)
+
+                # 3. Horizontal Internal Pane Divider Line with T-Junctions (Row 2)
                 $activeNbName = Get-ActiveNotebookName
                 $leftTitle = " WORKSPACE: $activeNbName "
                 $sortIcon = if ($script:SortMode -eq "alpha") { $gSortAlpha } else { $gSortDate }
@@ -2367,13 +2396,11 @@ function Start-NotebookBrowser {
                     $rightDashes = [Math]::Max(0, $rightWidth - $rightTitle.Length - 1)
                 }
 
-                # Outer Box Gradient Colors (Slate Graphite / Gray -> Vivid Flame Orange)
-                $cBorderStart = @(95, 100, 115)
-                $cBorderEnd   = @(255, 130, 0)
-                $topBorderColor = fg $cBorderStart[0] $cBorderStart[1] $cBorderStart[2]
-                $botBorderColor = fg $cBorderEnd[0] $cBorderEnd[1] $cBorderEnd[2]
+                $bMidLeft  = $topBorderColor + $uMidLeft + $rst
+                $bMidT     = $topBorderColor + $bTopT + $rst
+                $bMidRight = $topBorderColor + $uMidRight + $rst
 
-                [void]$sb.Append($topBorderColor + $uRoundTL + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $leftDashes) + $cAmber + $sortBadge + $topBorderColor + ($bHoriz * $sortBufferLen) + $bTopT + $bHoriz + $cOrange + $rightTitle + $topBorderColor + ($bHoriz * $rightDashes) + $uRoundTR + $rst + "`r`n")
+                [void]$sb.Append($bMidLeft + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $leftDashes) + $cAmber + $sortBadge + $topBorderColor + ($bHoriz * $sortBufferLen) + $bMidT + $bHoriz + $cOrange + $rightTitle + $topBorderColor + ($bHoriz * $rightDashes) + $bMidRight + $rst + "`r`n")
 
                 # 3. Render Rows
                 for ($r = 0; $r -lt $boxHeight; $r++) {
@@ -2456,7 +2483,7 @@ function Start-NotebookBrowser {
                 # 4. Box Footer
                 $verTag = " v$AppVersion "
                 $footLeftDashes = [Math]::Max(0, $rightWidth - $verTag.Length)
-                [void]$sb.AppendLine($botBorderColor + $uRoundBL + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $footLeftDashes) + $cGray + $verTag + $botBorderColor + $uRoundBR + $rst)
+                [void]$sb.AppendLine($botBorderColor + $bBotLeft + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $footLeftDashes) + $cGray + $verTag + $botBorderColor + $bBotRight + $rst)
 
                 # 5. Navigation Bar
                 [void]$sb.Append($navBar)
