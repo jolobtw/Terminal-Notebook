@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.0"
+$AppVersion = "2.6.1"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -284,8 +284,8 @@ function Invoke-TerminalEditor {
 
     $edArgs = @()
     if ($edLeaf -match 'hx') {
-        if ($GoToEnd) { $edArgs += "$FilePath`:$lastLine" }
-        else { $edArgs += "$FilePath" }
+        if ($GoToEnd) { $edArgs += "+$lastLine" }
+        $edArgs += "$FilePath"
     } elseif ($edLeaf -match 'micro') {
         $edArgs += @("-colorscheme", "simple", "-softwrap", "true", "-wordwrap", "true", "$FilePath")
         if ($GoToEnd) { $edArgs += "+$lastLine" }

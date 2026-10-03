@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.1
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Helix Path Parsing:** Fixed a bug where creating a new note or jumping to the end of an existing note caused a crash or error message. The script previously appended the line number to the file path using the `file:line` syntax, which caused Helix's internal parser to critically fail when trying to read Windows absolute paths containing drive letter colons (e.g., `C:\...`). The app now safely passes the line number using Helix's `+N` CLI flag.
+
 ## Version 2.6.0
 **Date:** 2026-10-02
 
