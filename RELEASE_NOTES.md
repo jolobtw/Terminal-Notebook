@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.2.4
+**Date:** 2026-10-03
+
+### Modal Error Dialogs & Duplicate Folder Handling
+- **Duplicate Folder Error Modal:** Attempting to create a folder with a name that already exists in the target directory now displays an interactive floating alert modal (`FOLDER ALREADY EXISTS`).
+- **Interactive Acknowledge Option:** Users can easily dismiss error cards with `[Enter]`, `[Esc]`, or `[Space]`, eliminating silent failures when creating or renaming folders.
+
 ## Version 3.2.3
 **Date:** 2026-10-03
 

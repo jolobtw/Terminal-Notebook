@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.2.3"
+$AppVersion = "3.2.4"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -640,6 +640,73 @@ function Show-InlineConfirmModal {
 
         if ($k.Key -eq "Y") { return $true }
         if ($k.Key -in @("N", "Escape", "Q")) { return $false }
+    }
+}
+
+function Show-InlineAlertModal {
+    param(
+        [string]$Title = "ERROR",
+        [string]$Message,
+        [string]$SubMessage = "Press Enter or Esc to acknowledge.",
+        [scriptblock]$RenderBgBlock
+    )
+
+    Set-CursorVisible $false
+
+    while ($true) {
+        $bgLines = & $RenderBgBlock
+        $termW = 99
+        try { if ([Console]::WindowWidth -gt 20) { $termW = [Console]::WindowWidth - 1 } } catch {}
+
+        $cardW = [Math]::Min(60, [Math]::Max(44, $termW - 10))
+        $msgDisp = Truncate-String -Str $Message -MaxLen ($cardW - 4)
+        $subDisp = Truncate-String -Str $SubMessage -MaxLen ($cardW - 4)
+
+        $cCardBg = bg 44 32 34
+
+        $titleDisp = Truncate-String -Str $Title -MaxLen ($cardW - 6)
+        $headerTitle = " $titleDisp "
+        $dashRight = [Math]::Max(2, $cardW - 3 - $headerTitle.Length)
+        $topBorderColor = fg 255 90 90
+        $botBorderColor = fg 255 120 40
+        $cardVBar = (fg 255 100 30) + $bVert
+
+        $modalLines = [System.Collections.Generic.List[string]]::new()
+        $modalLines.Add($cCardBg + $topBorderColor + $uRoundTL + $bHoriz + $cWarn + $headerTitle + $topBorderColor + ($bHoriz * $dashRight) + $uRoundTR + $rst)
+
+        $modalLines.Add($cCardBg + $cardVBar + (" " * ($cardW - 2)) + $cardVBar + $rst)
+
+        $msgPad = " " * [Math]::Max(0, $cardW - 4 - $msgDisp.Length)
+        $modalLines.Add($cCardBg + $cardVBar + " " + $cWhite + $sBold + $msgDisp + $sNoBold + $msgPad + " " + $cardVBar + $rst)
+
+        if ($subDisp) {
+            $subPad = " " * [Math]::Max(0, $cardW - 4 - $subDisp.Length)
+            $modalLines.Add($cCardBg + $cardVBar + " " + $cWarn + $subDisp + $subPad + " " + $cardVBar + $rst)
+        } else {
+            $modalLines.Add($cCardBg + $cardVBar + (" " * ($cardW - 2)) + $cardVBar + $rst)
+        }
+
+        $modalLines.Add($cCardBg + $cardVBar + (" " * ($cardW - 2)) + $cardVBar + $rst)
+
+        $footerKeys = "$cOrange[Enter/Esc]$cSilver Acknowledge"
+        $footerVisibleLen = ($AnsiRegex.Replace($footerKeys, '')).Length
+        $footDashRight = [Math]::Max(2, $cardW - 6 - $footerVisibleLen)
+        $modalLines.Add($cCardBg + $botBorderColor + $uRoundBL + ($bHoriz * 2) + " " + $footerKeys + $cCardBg + " " + $botBorderColor + ($bHoriz * $footDashRight) + $uRoundBR + $rst)
+
+        $compositeFrame = Overlay-ModalOnFrame -FrameLines $bgLines -ModalLines $modalLines -TermWidth $termW
+
+        $sb = [System.Text.StringBuilder]::new()
+        foreach ($line in $compositeFrame) {
+            [void]$sb.AppendLine($line)
+        }
+        try { [Console]::SetCursorPosition(0, 0) } catch {}
+        [Console]::Write("$esc[H")
+        [Console]::Write($sb.ToString().Replace("`r`n", "$esc[K`r`n") + "$esc[K$esc[J")
+
+        try { $k = Read-KeyOrResize } catch { return }
+        if ($null -eq $k) { continue }
+
+        if ($k.Key -in @("Enter", "Escape", "Spacebar", "Q")) { return }
     }
 }
 
@@ -1549,10 +1616,16 @@ function New-FolderPrompt {
         if ([string]::IsNullOrWhiteSpace($folderName)) { return }
 
         $safeName = ConvertTo-Slug $folderName
-        if (-not $safeName) { return }
+        if (-not $safeName) {
+            Show-InlineAlertModal -Title "INVALID FOLDER NAME" -Message "The folder name '$folderName' is invalid." -SubMessage "Please use letters, numbers, spaces, or hyphens." -RenderBgBlock $RenderBgBlock
+            return
+        }
         $newFolderPath = Join-Path $targetParent $safeName
 
-        if (Test-Path -LiteralPath $newFolderPath) { return }
+        if (Test-Path -LiteralPath $newFolderPath) {
+            Show-InlineAlertModal -Title "FOLDER ALREADY EXISTS" -Message "Folder '$safeName' already exists in this location." -SubMessage "Please choose a different name for your folder." -RenderBgBlock $RenderBgBlock
+            return
+        }
 
         [void][System.IO.Directory]::CreateDirectory($newFolderPath)
         $script:LastActionPath = $newFolderPath
@@ -1611,11 +1684,18 @@ function Rename-ItemPrompt {
         if ([string]::IsNullOrWhiteSpace($newName)) { return }
 
         $safeName = if ($isFolder) { ConvertTo-Slug $newName } else { ConvertTo-Slug $newName -Lower }
-        if (-not $safeName) { return }
+        if (-not $safeName) {
+            Show-InlineAlertModal -Title "INVALID NAME" -Message "The name '$newName' is invalid." -SubMessage "Please use letters, numbers, spaces, or hyphens." -RenderBgBlock $RenderBgBlock
+            return
+        }
         if (-not $isFolder) { $safeName += ".md" }
 
         $newPath = Join-Path (Split-Path $Item.FullName -Parent) $safeName
-        if (Test-Path -LiteralPath $newPath) { return }
+        if (Test-Path -LiteralPath $newPath) {
+            $itemTypeStr = if ($isFolder) { "Folder" } else { "Note" }
+            Show-InlineAlertModal -Title "ITEM ALREADY EXISTS" -Message "$itemTypeStr '$safeName' already exists in this location." -SubMessage "Please choose a different name." -RenderBgBlock $RenderBgBlock
+            return
+        }
 
         Rename-Item -LiteralPath $Item.FullName -NewName $safeName
         if ($isFolder -and $script:CollapsedFolders.ContainsKey($Item.FullName)) {
