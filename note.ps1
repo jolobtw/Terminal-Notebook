@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.1.1"
+$AppVersion = "3.1.2"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -859,7 +859,7 @@ $NavSpec = @(
     @{ Key = "[O]";     Label = " Obsidian ";   When = "Note" },
     @{ Key = "[N]";     Label = " Note " },
     @{ Key = "[F]";     Label = " Folder " },
-    @{ Key = "[U]";     Label = (" Updates (v" + $AppVersion + ") ") },
+    @{ Key = "[U]";     Label = " Updates " },
     @{ Key = "[R]";     Label = " Rename " },
     @{ Key = "[X]";     Label = " Del " },
     @{ Key = "[Q]";     Label = " Exit" }
@@ -2280,8 +2280,8 @@ function Start-NotebookBrowser {
 
                 # 4. Box Footer
                 $verTag = " v$AppVersion "
-                $footRightDashes = [Math]::Max(0, $rightWidth - $verTag.Length - 2)
-                [void]$sb.AppendLine($botBorderColor + $uRoundBL + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * 2) + $cGray + $verTag + $botBorderColor + ($bHoriz * $footRightDashes) + $uRoundBR + $rst)
+                $footLeftDashes = [Math]::Max(0, $rightWidth - $verTag.Length)
+                [void]$sb.AppendLine($botBorderColor + $uRoundBL + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $footLeftDashes) + $cGray + $verTag + $botBorderColor + $uRoundBR + $rst)
 
                 # 5. Navigation Bar
                 [void]$sb.Append($navBar)

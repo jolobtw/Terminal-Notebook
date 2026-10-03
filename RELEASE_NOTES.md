@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.1.2
+**Date:** 2026-10-03
+
+### Visual Polish & Layout Un-Cluttering
+- **Far-Right Version Placement:** Positioned the subtle Slate Gray version tag (`v3.1.2`) at the far bottom-right corner of the main application window border (`╰─────────────────┴────────────────── v3.1.2 ╯`).
+- **Clean Action Legend:** Restored the bottom navigation shortcut legend for `[U] Updates` to clean text, ensuring hotkey badges remain uncluttered and easy to read.
+
 ## Version 3.1.1
 **Date:** 2026-10-03
 
