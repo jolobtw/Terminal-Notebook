@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.11
+**Date:** 2026-10-02
+
+### Documentation
+- **README Overhaul:** Completely rewrote `README.md` to be highly professional and comprehensive. It now accurately details the rich markdown engine, the Windows Terminal split-pane integrations, the custom TUI styling, and the Obsidian interoperability. Structured placeholders were also added for upcoming screenshot assets.
+
 ## Version 2.6.10
 **Date:** 2026-10-02
 

@@ -1,59 +1,77 @@
 # Terminal Notes
 
-A terminal-based notebook for browsing, writing, and organizing Markdown notes. It combines the speed of the command line with the rich formatting of modern note-taking apps like Obsidian.
+A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing, and organizing Markdown notes. It bridges the speed and workflow of the command line with the rich formatting and organizational power of modern note-taking apps like Obsidian.
 
-## Features
+![Terminal Notes Main UI](docs/main-ui.png)
+*(Drop a screenshot of the main Notebook Browser here!)*
 
-* **Terminal Markdown Rendering**: Natively parses and renders Markdown including Obsidian property cards, headers, blockquotes, Obsidian callouts (`> [!NOTE]`), checklists, fenced code blocks, tables, WikiLinks, and inline markdown (bold, italics, highlights, strikethroughs).
-* **Collapsible Folder Hierarchy**: Navigate through your `~/Notes` folder seamlessly with an interactive terminal tree view.
-* **Cross-Platform Compatibility**: Works identically on Windows and macOS via PowerShell Core (`pwsh`).
-* **Seamless Split-Pane Editing**: When running within modern Windows Terminal, editing or creating a note automatically splits your current tab side-by-side, allowing you to edit in your preferred tool (`hx`, `nvim`, etc.) without losing context of your folder tree!
-* **Obsidian Integration**: Deeply integrates with Obsidian. Create or open notes directly in Obsidian from the terminal, or edit them using terminal editors like `hx`, `nvim`, or `nano`.
-* **Dynamic Layout**: The terminal interface dynamically resizes to fill your terminal window without flickering or artifacting. Long notes support `[J/K]` or `PageUp/PageDown` scrolling right in the preview pane.
-* **Quick Logs & Appending**: Quickly append thoughts or daily logs without needing to open a full text editor.
+## 🌟 Key Features
 
-## Prerequisites
+### 🖥️ Immersive Terminal UI
+* **Notebook Browser:** An interactive, zero-flicker TUI (Text User Interface) that reacts instantly to keystrokes.
+* **Sleek Aesthetics:** Features beautifully styled Flame Orange to Radiant Amber gradient UIs, subtle Dark Gray tree connectors (`├─`, `└─`), and intelligent layout spacing for a clean, modern look.
+* **Frictionless Navigation:** Use `W/A/S/D` or Arrow Keys to fluidly navigate your folder hierarchy. The layout engine intelligently bypasses visual spacers to save you keystrokes.
+* **Dynamic Reflow:** The interface dynamically resizes to perfectly fill your terminal window without artifacting or line-wrapping destruction.
 
+### 📝 Rich Markdown Engine
+* **Native Terminal Rendering:** Renders raw Markdown directly into colorful terminal output.
+* **Advanced Element Support:** Perfectly parses and renders YAML Property Cards (Frontmatter), Obsidian-style Callouts (`> [!NOTE]`), checklists (`- [x]`), blockquotes, tables, and fenced code blocks.
+* **Inline Styling:** Supports Bold, Italics, Highlights (`==text==`), Strikethroughs, standard Markdown links, and Obsidian WikiLinks.
+* **Fullscreen Reader:** Press `V` or `Enter` to drop into a distraction-free fullscreen reading environment with built-in scrolling.
+
+![Fullscreen Reader](docs/fullscreen-reader.png)
+*(Drop a screenshot of the Fullscreen Reader here!)*
+
+### ⚡ Seamless Editing Workflows
+* **Split-Pane Editing (Windows Terminal):** When running within modern Windows Terminal, creating or editing a note instantly splits your terminal side-by-side! Edit in your preferred tool without losing sight of your folder tree.
+* **Editor Auto-Discovery:** Automatically detects and launches powerful terminal editors like `hx` (Helix), `micro`, `nvim`, `vim`, or `nano`.
+* **Quick Logging:** Quickly append passing thoughts to your daily log straight from the command line (`note "My quick thought"`).
+
+### 🌌 Deep Obsidian Integration
+* **Vault Detection:** Automatically reads your macOS or Windows Obsidian configurations to perfectly sync with your Vault.
+* **Direct Launching:** Press `O` on any note to instantly open it inside the native Obsidian desktop application.
+
+---
+
+## 🚀 Installation & Setup
+
+### Prerequisites
 * **PowerShell**: 
-  * Windows: Included by default (PowerShell 5.1+ supported).
-  * macOS: Requires PowerShell Core (`brew install --cask powershell`).
-* **Nerd Fonts** (Optional but recommended): Ensure your terminal uses a Nerd Font for folder and file icons to render correctly.
-* **Git** (Optional): For tracking and backing up notes.
+  * **Windows:** Included by default (PowerShell 5.1+ supported).
+  * **macOS:** Requires PowerShell Core (`brew install --cask powershell`).
+* **Nerd Fonts:** Ensure your terminal uses a Nerd Font for folder and file icons to render correctly.
+* **Terminal Editor:** We highly recommend installing [Helix](https://helix-editor.com/) (`winget install helix`) or [Micro](https://micro-editor.github.io/) for the best in-terminal editing experience.
 
-## Installation
+### Setup
+1. Clone this repository or download the `note.ps1` script to your system.
+2. Open your PowerShell profile (`notepad $PROFILE`).
+3. Add the following alias so you can launch the app from anywhere:
+   ```powershell
+   Set-Alias -Name note -Value "C:\path\to\TerminalNotes\note.ps1"
+   ```
 
-Simply clone this repository or download the `note.ps1` script to your system.
+---
 
-```bash
-git clone https://github.com/josephdieringer-lang/TerminalNotes.git
-cd TerminalNotes
-```
+## ⌨️ Keyboard Shortcuts
 
-## Usage
+| Key | Action |
+|-----|--------|
+| `W/S` or `Up/Dn` | Move selection up or down |
+| `A/D` or `L/R` | Expand or collapse folders |
+| `J/K` or `PgUp/PgDn` | Scroll through long file previews |
+| `Enter` | Expand Folders |
+| `V` | Open Note in Fullscreen Reader |
+| `E` | Edit Note (Split-Pane Editor) |
+| `O` | Open Note in Obsidian Desktop |
+| `N` | Create a New Note |
+| `F` | Create a New Folder |
+| `R` | Rename Item |
+| `X` or `Del` | Delete Item |
+| `U` | View App Updates / Release Notes |
+| `T` | Toggle Sorting (A-Z vs Date Modified) |
+| `Q` or `Esc` | Exit |
 
-Run the script from your terminal:
+---
 
-```powershell
-./note.ps1
-```
-
-Or map it to an alias in your PowerShell profile (`$PROFILE`):
-```powershell
-Set-Alias -Name note -Value "C:\path\to\TerminalNotes\note.ps1"
-```
-
-### Keyboard Navigation
-
-* `[W/S]` or `Up/Down` - Move selection
-* `[A/D]` - Expand/Collapse folders
-* `[J/K]` or `PageUp/PageDown` - Scroll through long previews
-* `[N]` - Create a new Note (opens automatically in terminal editor)
-* `[F]` - Create a new Folder
-* `[R]` - Rename item
-* `[X]` - Delete item
-* `[E]` - Edit Note (opens automatically in terminal editor)
-* `[O]` - Open in Obsidian
-* `[Enter]` - Fullscreen Reader (Supports scrolling via `Up/Down` or `PageUp/PageDown`)
-
-## License
+## 📄 License
 MIT License
