@@ -139,3 +139,15 @@ vim) opens natively on the right. When you exit your editor, the split-pane vani
 
 ### Features & Tweaks
 - **UI Consistency:** Applied the sleek, rounded gradient borders (previously only seen on the Folder Telemetry card) to all bordered elements throughout the note viewer! This includes Properties blocks, Fenced Code blocks, Markdown Tables, Blockquotes, and Horizontal Rules. The `Flame Orange -> Graphite` gradient now themes the entire application for a perfectly unified aesthetic.
+
+## Version 2.3.0
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Terminal Flickering:** Fixed an issue where the entire terminal (mostly noticeable in the title bar) would flicker continuously. This was caused by the 25ms `Start-Sleep` polling loop triggering PowerShell's default progress bar rendering. The polling loop now explicitly silences progress bars to run invisibly.
+
+## Version 2.4.0
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Consistency:** Aligned the width and padding of the Folder Telemetry section with the Note Properties section, ensuring the right and left borders remain perfectly static and don't jump around when navigating between notes and folders.

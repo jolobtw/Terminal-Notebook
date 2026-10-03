@@ -14,7 +14,10 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.2.0"
+$AppVersion = "2.4.0"
+
+# Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
+$ProgressPreference = 'SilentlyContinue'
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -1266,25 +1269,25 @@ function Start-NotebookBrowser {
             if ($activeItem.Type -eq "Folder") {
                 $currentRightTitle = "Folder: " + $activeItem.Name
 
-                $telemetryWidth = [Math]::Max(30, $usableWidth)
+                $telemetryWidth = [Math]::Max(20, $usableWidth - 2)
 
                 $boxTitle = " FOLDER TELEMETRY "
-                $dashesLeft = 2
+                $dashesLeft = 1
                 $dashesRight = [Math]::Max(2, $telemetryWidth - $boxTitle.Length - $dashesLeft - 2)
                 # Reverse gradient: Orange to DarkGray
                 $topBorderStr = $uRoundTL + ($uHoriz * $dashesLeft) + $boxTitle + ($uHoriz * $dashesRight) + $uRoundTR
-                $coloredTop = "  " + (Render-GradientText $topBorderStr $gWaveOrange $gWaveDark)
+                $coloredTop = " " + (Render-GradientText $topBorderStr $gWaveOrange $gWaveDark)
                 $previewLines += $coloredTop
 
                 $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
                 $rightBar = Render-GradientText $uVert $gWaveDark $gWaveOrange
 
                 $statusStr = if ($activeItem.IsExpanded) { "Open [v]" } else { "Closed [>]" }
-                $shortName = Truncate-String -Str $activeItem.Name -MaxLen ($telemetryWidth - 18)
+                $shortName = Truncate-String -Str $activeItem.Name -MaxLen ($telemetryWidth - 15)
                 $noteCountStr = if ($activeItem.ItemCount -gt 0) { "$($activeItem.ItemCount) note(s)" } else { "0 notes (empty)" }
                 $relPath = $activeItem.FullName.Substring($NotesDir.Length).TrimStart('\', '/')
                 if ([string]::IsNullOrEmpty($relPath)) { $relPath = "/" }
-                $shortRelPath = Truncate-String -Str ("~/Notes/" + $relPath) -MaxLen ($telemetryWidth - 18)
+                $shortRelPath = Truncate-String -Str ("~/Notes/" + $relPath) -MaxLen ($telemetryWidth - 15)
 
                 $cCardLabel  = fg 155 160 175
 
@@ -1292,7 +1295,7 @@ function Start-NotebookBrowser {
                     $content = " " + $lbl.PadRight(10) + ": " + $val
                     $padLen = [Math]::Max(0, $telemetryWidth - 2 - $content.Length)
                     $pad = " " * $padLen
-                    return "  " + $leftBar + $cCardLabel + " " + $lbl.PadRight(10) + ": " + $valCol + $val + $rst + $pad + $rightBar
+                    return " " + $leftBar + $cCardLabel + " " + $lbl.PadRight(10) + ": " + $valCol + $val + $rst + $pad + $rightBar
                 }
 
                 $previewLines += Get-TLine "Folder" $shortName $cWhite
@@ -1301,19 +1304,19 @@ function Start-NotebookBrowser {
                 $previewLines += Get-TLine "Path" $shortRelPath $cGray
 
                 $botBorderStr = $uRoundBL + ($uHoriz * ($telemetryWidth - 2)) + $uRoundBR
-                $coloredBot = "  " + (Render-GradientText $botBorderStr $gWaveOrange $gWaveDark)
+                $coloredBot = " " + (Render-GradientText $botBorderStr $gWaveOrange $gWaveDark)
                 $previewLines += $coloredBot
                 $previewLines += ""
 
                 $folderFiles = Get-ChildItem -Path $activeItem.FullName -File -Filter "*.md" -ErrorAction SilentlyContinue
-                $previewLines += ("  " + $cOrange + "Notes Inside:" + $rst)
+                $previewLines += (" " + $cOrange + "Notes Inside:" + $rst)
                 if ($folderFiles -and $folderFiles.Count -gt 0) {
                     foreach ($ff in $folderFiles) {
                         $cleanTitle = Format-NoteTitle $ff
-                        $previewLines += ("    " + $cWhite + "* " + $cleanTitle + $rst)
+                        $previewLines += ("   " + $cWhite + "* " + $cleanTitle + $rst)
                     }
                 } else {
-                    $previewLines += ("    " + $cGray + "*(No notes yet in this folder)*" + $rst)
+                    $previewLines += ("   " + $cGray + "*(No notes yet in this folder)*" + $rst)
                 }
                 $previewLines += ""
                 $previewLines += ("  " + $cOrange + "Folder Actions:" + $rst)
