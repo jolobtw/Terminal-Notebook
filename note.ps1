@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.2.2"
+$AppVersion = "3.2.3"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -2301,10 +2301,7 @@ function Start-NotebookBrowser {
                     if ($itemIdx -lt $treeItems.Count) {
                         $cur = $treeItems[$itemIdx]
                         $treePrefix = ""
-                        if ($cur.Level -eq 1) {
-                            $treePrefix = "  "
-                        } elseif ($cur.Level -ge 2) {
-                            $treePrefix = "  "
+                        if ($cur.Level -gt 0) {
                             if ($cur.AncestorsHasNext -and $cur.AncestorsHasNext.Count -gt 1) {
                                 for ($a = 1; $a -lt $cur.AncestorsHasNext.Count; $a++) {
                                     if ($cur.AncestorsHasNext[$a]) {

@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.2.3
+**Date:** 2026-10-03
+
+### Navigation Tree Lines & Folder Belonging
+- **Folder Contents Tree Connections:** Restored connecting tree lines (`├──`, `└──`) for all items inside folders (including top-level root folders), visually connecting notes and subfolders directly to their parent folder.
+- **Clean Root Category Headers:** Maintained standalone top-level root folders (`Level 0`) without lines connecting separate top-level folders to one another.
+
 ## Version 3.2.2
 **Date:** 2026-10-03
 
