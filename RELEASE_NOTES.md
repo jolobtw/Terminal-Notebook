@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.0.4
+**Date:** 2026-10-03
+
+### Bug Fixes & Visual Polish
+- **Solid Dark Slate Card Backgrounds:** Applied opaque dark slate background styling (`bg 34 37 48` for input modals and `bg 44 32 34` for confirmation modals) to all inline popup card lines (`[N]`, `[F]`, `[R]`, `[X]`, `[L]`). This completely hides background tree/preview text behind the modal card, making the modal an opaque floating card element.
+- **Unified Side Border Contrast:** Standardized top, side (`│`), and bottom border colors to vibrant Flame Orange (`#FF8C1E`) and Hot Orange-Red, ensuring left and right card side borders render with 100% full visual continuity and crisp contrast against the background TUI.
+
 ## Version 3.0.3
 **Date:** 2026-10-03
 
