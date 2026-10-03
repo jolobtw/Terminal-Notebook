@@ -71,7 +71,4 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 | `T` | Toggle Sorting (A-Z vs Date Modified) |
 | `Q` or `Esc` | Exit |
 
----
 
-## 📄 License
-MIT License
