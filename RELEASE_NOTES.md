@@ -120,3 +120,10 @@ vim) opens natively on the right. When you exit your editor, the split-pane vani
 - **Pane Split Tearing:** Fixed a race condition where launching the side-by-side terminal editor caused the Notebook Browser to redraw with its original full-width dimensions before the window could finish resizing, leading to catastrophic line wrapping.
 - **Responsive Redraws:** Overhauled the navigation event loop. The app no longer completely halts while waiting for keystrokes; it now actively polls at 40hz, instantly detecting window size changes (such as when your right-hand split pane closes) and seamlessly repainting the UI back to full-screen.
 - **ANSI Truncation Overflow:** Fixed a bug where colored text strings (like empty folder warnings or dynamic menus) bypassed the right boundary length constraints, shoving the UI border out of alignment on smaller windows.
+
+## Version 2.1.0
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **Streamlined Workflow:** Removed the interstitial prompt when creating or editing a note. The application now seamlessly defaults to opening your preferred terminal editor (like `micro`). If no terminal editor is installed, it intelligently falls back to launching the note in Obsidian.
+- **Native Theming:** When the application launches `micro`, it now automatically applies the `simple` color scheme to natively match the colors of your terminal environment.

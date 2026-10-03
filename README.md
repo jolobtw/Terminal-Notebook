@@ -47,11 +47,11 @@ Set-Alias -Name note -Value "C:\path\to\TerminalNotes\note.ps1"
 * `[W/S]` or `Up/Down` - Move selection
 * `[A/D]` - Expand/Collapse folders
 * `[J/K]` or `PageUp/PageDown` - Scroll through long previews
-* `[N]` - Create a new Note
+* `[N]` - Create a new Note (opens automatically in terminal editor)
 * `[F]` - Create a new Folder
 * `[R]` - Rename item
 * `[X]` - Delete item
-* `[E]` - Edit Note in Terminal
+* `[E]` - Edit Note (opens automatically in terminal editor)
 * `[O]` - Open in Obsidian
 * `[Enter]` - Fullscreen Reader
 

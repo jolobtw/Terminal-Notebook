@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.0.1"
+$AppVersion = "2.1.0"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -272,7 +272,7 @@ function Invoke-TerminalEditor {
 
     $edArgs = @()
     if ($edLeaf -match 'micro') {
-        $edArgs += @("-softwrap", "true", "-wordwrap", "true", "$FilePath")
+        $edArgs += @("-colorscheme", "simple", "-softwrap", "true", "-wordwrap", "true", "$FilePath")
         if ($GoToEnd) { $edArgs += "+$lastLine" }
     } elseif ($edLeaf -match 'nvim|vim|nano') {
         if ($GoToEnd) { $edArgs += "+$lastLine" }
@@ -989,102 +989,20 @@ function New-InteractiveNote {
     }
 
     $ed = Get-PreferredTerminalEditor
-    $edName = if ($ed) { Split-Path $ed -Leaf } else { $null }
-
-    Write-Host "`nWhere would you like to write?" -ForegroundColor DarkGray
-    if ($ed) {
-        Write-Host "  [1] Inside Terminal (using $edName)" -ForegroundColor White
-        Write-Host "  [2] Open in Obsidian" -ForegroundColor White
-        Write-Host "  [3] Quick text entry in terminal" -ForegroundColor White
-        Write-Host "  [4] Open in Windows Notepad" -ForegroundColor DarkGray
-    } else {
-        Write-Host "  [1] Open in Obsidian" -ForegroundColor White
-        Write-Host "  [2] Quick text entry in terminal" -ForegroundColor White
-        Write-Host "  [3] Open in Windows Notepad" -ForegroundColor DarkGray
-    }
-    Write-Host "  [C] Cancel" -ForegroundColor DarkGray
-    Write-Host "Choice (press Enter for 1, or 'c' to cancel): " -ForegroundColor White -NoNewline
-    $inputChoice = Read-Host
-
-    if ($inputChoice.Trim().ToLower() -in @("c", "cancel", "q", "exit", "quit")) {
-        Write-Host "Note creation cancelled." -ForegroundColor DarkYellow
-        Start-Sleep -Milliseconds 600
-        return $null
-    }
 
     $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm")
     $initialContent = "---`r`ntitle: `"$title`"`r`ndate: $timestamp`r`ntags:`r`n  - note`r`n---`r`n`r`n# $title`r`n`r`n"
 
-    $selectedAction = "terminal"
+    Set-Content -Path $filePath -Value $initialContent -Encoding UTF8
+
     if ($ed) {
-        switch ($inputChoice.Trim()) {
-            "2" { $selectedAction = "obsidian" }
-            "3" { $selectedAction = "quicktext" }
-            "4" { $selectedAction = "notepad" }
-            default { $selectedAction = "terminal" }
-        }
+        Invoke-TerminalEditor -EditorPath $ed -FilePath $filePath -GoToEnd
+        Write-Host "Saved note: $fileName" -ForegroundColor Green
     } else {
-        switch ($inputChoice.Trim()) {
-            "2" { $selectedAction = "quicktext" }
-            "3" { $selectedAction = "notepad" }
-            default { $selectedAction = "obsidian" }
-        }
+        Open-InObsidian -File (Get-Item $filePath)
+        Write-Host "Created note in Obsidian: $fileName" -ForegroundColor Green
     }
-
-    switch ($selectedAction) {
-        "obsidian" {
-            Set-Content -Path $filePath -Value $initialContent -Encoding UTF8
-            Open-InObsidian -File (Get-Item $filePath)
-            Write-Host "Created note in Obsidian: $fileName" -ForegroundColor Green
-            Start-Sleep -Milliseconds 700
-        }
-        "notepad" {
-            Set-Content -Path $filePath -Value $initialContent -Encoding UTF8
-            if ($IsWindows) {
-                Start-Process notepad.exe -ArgumentList "`"$filePath`"" -Wait
-            } else {
-                Start-Process open -ArgumentList "-W", "`"$filePath`"" -Wait
-            }
-            Write-Host "Saved note: $fileName" -ForegroundColor Green
-            Start-Sleep -Milliseconds 700
-        }
-        "quicktext" {
-            Write-Host "`nEnter note text below." -ForegroundColor DarkCyan
-            Write-Host "(Press Enter on an empty line to save, or type ':cancel' to abort)" -ForegroundColor DarkGray
-            Write-Host ""
-            $lines = @()
-            $wasCancelled = $false
-            while ($true) {
-                $line = Read-Host
-                if ($line.Trim().ToLower() -in @(":c", ":cancel", ":q", ":abort")) {
-                    $wasCancelled = $true
-                    break
-                }
-                if ([string]::IsNullOrEmpty($line)) {
-                    break
-                }
-                $lines += $line
-            }
-
-            if ($wasCancelled) {
-                Write-Host "`nNote creation cancelled. Nothing was saved." -ForegroundColor DarkYellow
-                Start-Sleep -Milliseconds 700
-                return $null
-            }
-
-            $body = if ($lines.Count -gt 0) { $lines -join "`r`n" } else { "*(No content)*" }
-            $fullContent = $initialContent + $body + "`r`n"
-            Set-Content -Path $filePath -Value $fullContent -Encoding UTF8
-            Write-Host "`nSaved: $fileName" -ForegroundColor Green
-            Start-Sleep -Milliseconds 800
-        }
-        default {
-            Set-Content -Path $filePath -Value $initialContent -Encoding UTF8
-            Invoke-TerminalEditor -EditorPath $ed -FilePath $filePath -GoToEnd
-            Write-Host "Saved note: $fileName" -ForegroundColor Green
-            Start-Sleep -Milliseconds 700
-        }
-    }
+    Start-Sleep -Milliseconds 700
 
     return $filePath
 }
@@ -1163,67 +1081,10 @@ function Edit-NoteFile {
 
     $terminalEditor = Get-PreferredTerminalEditor
 
-    Clear-Host
-    Write-Host "==================================================" -ForegroundColor DarkGray
-    Write-Host ($cOrange + "                  EDIT NOTE                       " + $rst)
-    Write-Host "==================================================" -ForegroundColor DarkGray
-    Write-Host " Note: $($File.Name)`n" -ForegroundColor White
-
-    Write-Host "How would you like to edit?" -ForegroundColor DarkGray
     if ($terminalEditor) {
-        $edName = Split-Path $terminalEditor -Leaf
-        Write-Host "  [1] Inside Terminal (using $edName)" -ForegroundColor White
-        Write-Host "  [2] Open in Obsidian" -ForegroundColor White
-        Write-Host "  [3] Append lines in Terminal (no editor needed)" -ForegroundColor White
-        Write-Host "  [4] Open in Windows Notepad" -ForegroundColor DarkGray
+        Invoke-TerminalEditor -EditorPath $terminalEditor -FilePath $File.FullName -GoToEnd
     } else {
-        Write-Host "  [1] Open in Obsidian" -ForegroundColor White
-        Write-Host "  [2] Append lines in Terminal (no editor needed)" -ForegroundColor White
-        Write-Host "  [3] Open in Windows Notepad" -ForegroundColor DarkGray
-    }
-    Write-Host "  [C] Cancel" -ForegroundColor DarkGray
-    Write-Host "`nChoice (press Enter for 1, or 'c' to cancel): " -ForegroundColor Yellow -NoNewline
-    $choice = Read-Host
-
-    if ($choice.Trim().ToLower() -in @("c", "cancel", "q", "exit", "quit")) {
-        return
-    }
-
-    if ($terminalEditor) {
-        switch ($choice.Trim()) {
-            "2" {
-                Open-InObsidian -File $File
-            }
-            "3" {
-                Append-ToNote -File $File
-            }
-            "4" {
-                if ($IsWindows) {
-                    Start-Process notepad.exe -ArgumentList "`"$($File.FullName)`"" -Wait
-                } else {
-                    Start-Process open -ArgumentList "-W", "`"$($File.FullName)`"" -Wait
-                }
-            }
-            default {
-                Invoke-TerminalEditor -EditorPath $terminalEditor -FilePath $File.FullName -GoToEnd
-            }
-        }
-    } else {
-        switch ($choice.Trim()) {
-            "2" {
-                Append-ToNote -File $File
-            }
-            "3" {
-                if ($IsWindows) {
-                    Start-Process notepad.exe -ArgumentList "`"$($File.FullName)`"" -Wait
-                } else {
-                    Start-Process open -ArgumentList "-W", "`"$($File.FullName)`"" -Wait
-                }
-            }
-            default {
-                Open-InObsidian -File $File
-            }
-        }
+        Open-InObsidian -File $File
     }
 }
 
