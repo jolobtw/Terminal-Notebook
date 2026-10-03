@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.1.0"
+$AppVersion = "2.1.1"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -267,8 +267,8 @@ function Invoke-TerminalEditor {
 
     $edLeaf = Split-Path $EditorPath -Leaf
 
-    $lines = Get-Content -Path $FilePath
-    $lastLine = if ($lines) { [Math]::Max(1, $lines.Count) } else { 1 }
+    $rawLines = Get-Content -Path $FilePath -Raw
+    $lastLine = if ($rawLines) { [Math]::Max(1, $rawLines.Split([char]10).Count) } else { 1 }
 
     $edArgs = @()
     if ($edLeaf -match 'micro') {

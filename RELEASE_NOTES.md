@@ -127,3 +127,9 @@ vim) opens natively on the right. When you exit your editor, the split-pane vani
 ### Features & Tweaks
 - **Streamlined Workflow:** Removed the interstitial prompt when creating or editing a note. The application now seamlessly defaults to opening your preferred terminal editor (like `micro`). If no terminal editor is installed, it intelligently falls back to launching the note in Obsidian.
 - **Native Theming:** When the application launches `micro`, it now automatically applies the `simple` color scheme to natively match the colors of your terminal environment.
+
+## Version 2.1.1
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Editor Cursor Placement:** Fixed an annoying bug where opening an existing note in a terminal editor (`micro`, `vim`, `nano`) would place the cursor on the last line containing text (the "last line -1"), rather than on the empty trailing newline. The script now parses the file natively, perfectly preserving trailing newlines and dropping your cursor at the absolute bottom of the file every time.
