@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.2.6"
+$AppVersion = "3.2.7"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -425,17 +425,17 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
     $leftCol = [Math]::Max(1, [int](($TermWidth - $mw) / 2))
 
     $outLines = [System.Collections.Generic.List[string]]::new()
+    $dimStyle = $cDarkGray + $sFaint
 
     for ($i = 0; $i -lt $FrameLines.Count; $i++) {
         if ($i -ge $topRow -and ($i - $topRow) -lt $mh) {
             $mIdx = $i - $topRow
-            $leftBgRaw = Limit-AnsiText $FrameLines[$i] $leftCol
-            $leftVisLen = ($AnsiRegex.Replace($leftBgRaw, '')).Length
-            if ($leftVisLen -lt $leftCol) {
-                $leftBgRaw += (" " * ($leftCol - $leftVisLen))
+            $leftPlain = Get-PlainSubstring $FrameLines[$i] 0 $leftCol
+            if ($leftPlain.Length -lt $leftCol) {
+                $leftPlain = $leftPlain.PadRight($leftCol)
             }
-            # Apply faint dimming to background text to the left of modal box
-            $leftBg = $sFaint + $leftBgRaw + $rst
+            # Fully dim nav tree background text to the left of modal box
+            $leftBg = $dimStyle + $leftPlain + $rst
 
             $modalStr = $ModalLines[$mIdx]
             $modalVisLen = ($AnsiRegex.Replace($modalStr, '')).Length
@@ -459,16 +459,20 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
                 if ($plainRight.Length -lt $rightPreviewLen) {
                     $plainRight = $plainRight.PadRight($rightPreviewLen)
                 }
-                # Dim preview text to the right of modal box
-                $rightPreview = $cDarkGray + $sFaint + $plainRight + $rst
+                # Fully dim preview text to the right of modal box
+                $rightPreview = $dimStyle + $plainRight + $rst
             }
 
-            $rightBorder = Get-RightBorderANSI $FrameLines[$i] $TermWidth
+            $rightBorder = $dimStyle + $bVert + $rst
 
             $outLines.Add($leftBg + $modalStr + $rightPreview + $rightBorder)
         } else {
-            # Apply faint dimming to full background rows outside modal box height
-            $outLines.Add($sFaint + $FrameLines[$i] + $rst)
+            # Fully dim all background rows outside modal box height
+            $plainLine = Get-PlainSubstring $FrameLines[$i] 0 $TermWidth
+            if ($plainLine.Length -lt $TermWidth) {
+                $plainLine = $plainLine.PadRight($TermWidth)
+            }
+            $outLines.Add($dimStyle + $plainLine + $rst)
         }
     }
     return $outLines

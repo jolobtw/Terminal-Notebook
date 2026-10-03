@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.2.7
+**Date:** 2026-10-03
+
+### Visual Polish & Modal Contrast
+- **Comprehensive Background Dimming:** Standardized background modal dimming by converting all background elements (nav tree items, preview pane text, headers, footers, and app borders) to a uniform faint dark gray style (`$cDarkGray + $sFaint`) whenever a modal popup is open, guaranteeing maximum contrast and legibility for active dialog cards.
+
 ## Version 3.2.6
 **Date:** 2026-10-03
 
