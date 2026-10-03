@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.0"
+$AppVersion = "3.3.1"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -2396,6 +2396,7 @@ function Start-NotebookBrowser {
                     $rowColor = $cSilver
                     $branchGlyph = $null
                     $cur = $null
+                    $leftPadding = "  "
                     if ($itemIdx -lt $treeItems.Count) {
                         $cur = $treeItems[$itemIdx]
                         $treePrefix = ""
@@ -2418,13 +2419,13 @@ function Start-NotebookBrowser {
                             $arrow = if ($cur.IsExpanded) { "$gArrowDown " } else { "$gArrowRight " }
                             $icon = if ($cur.IsExpanded) { "$gFolderOpen " } else { "$gFolderClosed " }
                             $countLabel = " ($($cur.ItemCount))"
-                            $maxNameLen = [Math]::Max(1, $leftWidth - $treePrefix.Length - 4 - $countLabel.Length)
+                            $maxNameLen = [Math]::Max(1, $leftWidth - $leftPadding.Length - $treePrefix.Length - 4 - $countLabel.Length)
                             $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
-                            $leftStr = "$treePrefix$arrow$icon$dispName$countLabel"
+                            $leftStr = "$leftPadding$treePrefix$arrow$icon$dispName$countLabel"
                         } elseif ($cur.Type -eq "Note") {
-                            $maxNameLen = [Math]::Max(1, $leftWidth - $treePrefix.Length - 3)
+                            $maxNameLen = [Math]::Max(1, $leftWidth - $leftPadding.Length - $treePrefix.Length - 3)
                             $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
-                            $leftStr = "$treePrefix$gFileIcon $dispName"
+                            $leftStr = "$leftPadding$treePrefix$gFileIcon $dispName"
                         }
                         # Spacers render blank and can never be highlighted
                         if ($itemIdx -eq $selectedIndex -and $cur.Type -ne "Spacer") { $rowColor = $cSelected }

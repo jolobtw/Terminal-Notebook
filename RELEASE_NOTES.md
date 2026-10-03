@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.1
+**Date:** 2026-10-03
+
+### Navigation Tree Spacing & Margin
+- **Left Border Margin:** Added a 2-space left margin buffer (`$leftPadding = "  "`) between the far left vertical border (`│`) and top-level folders/icons in the navigation tree.
+- **Improved Visual Comfort:** Un-cramped arrows (`▼`/`▶`), folder icons (`📁`), note icons (`📄`), and connecting tree branch lines (`├──`/`└──`), perfectly aligning tree items vertically under the top workspace header badge.
+
 ## Version 3.3.0
 **Date:** 2026-10-03
 
