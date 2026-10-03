@@ -1,5 +1,21 @@
 # Terminal Notebook Release Notes
 
+## Version 2.8.0
+**Date:** 2026-10-03
+
+### Features & Tweaks
+- **Multi-Notebook (Multi-Folder Workspace) Support:** Added native support for managing and switching between multiple distinct notebook workspace folders (e.g., Work vs. Personal).
+- **Interactive Workspace Switcher:** Press **`[B]`** inside the Notebook Browser to open the interactive workspace switcher modal to pick, add, or remove notebook folders.
+- **CLI Workspace Parameters & Profile Aliases:** Launch directly into a named workspace or folder path via `note work`, `note -Path ~/WorkNotes`, or manage profiles using `note notebook list|switch|add|remove`.
+- **Persistent Global Configuration:** Registered notebook workspace profiles and the active notebook directory persist globally in `~/.terminal_notebook.json`.
+- **UI Workspace Indicator:** The header banner and tree view box header now dynamically display the active workspace name (e.g. `[Work]`).
+
+## Version 2.6.11
+**Date:** 2026-10-02
+
+### Documentation
+- **Installation Instructions:** Updated the installation instructions in the README to reflect the `terminal-notebook` folder name in the alias path.
+
 ## Version 2.6.10
 **Date:** 2026-10-02
 

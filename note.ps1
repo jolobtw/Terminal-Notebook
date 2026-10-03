@@ -10,28 +10,198 @@ param(
     [Parameter(Position=0)]
     [string]$Command,
 
-    [Parameter(Position=1, ValueFromRemainingArguments=$true)]
-    [string[]]$ArgsList
+    [Parameter(Position=1)]
+    [string]$SubCommand,
+
+    [Parameter(Position=2, ValueFromRemainingArguments=$true)]
+    [string[]]$ArgsList,
+
+    [Alias("Path", "n")]
+    [string]$Notebook
 )
 
-$AppVersion = "2.6.10"
+$AppVersion = "2.8.0"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
-
-# Refresh PATH from registry so newly installed winget packages (like micro) work immediately
-try {
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-} catch {}
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 if ($null -eq $IsWindows) { $IsWindows = [System.Environment]::OSVersion.Platform -eq 'Win32NT' }
 if ($null -eq $IsMacOS) { $IsMacOS = [System.Environment]::OSVersion.Platform -eq 'Unix' -and (uname -s) -match 'Darwin' }
 
-$NotesDir = Join-Path $HOME "Notes"
-if (-not (Test-Path $NotesDir)) {
-    New-Item -ItemType Directory -Path $NotesDir -Force | Out-Null
+# Pick up PATH entries from newly installed winget packages (like micro) without restarting the shell.
+# Entries are only appended, so session-specific PATH changes (venvs, profile additions) are preserved.
+if ($IsWindows) {
+    try {
+        $sessionPaths = @($env:Path -split ';' | Where-Object { $_ })
+        $newPaths = foreach ($scope in 'Machine', 'User') {
+            [System.Environment]::GetEnvironmentVariable('Path', $scope) -split ';' |
+                Where-Object { $_ -and $sessionPaths -notcontains $_ }
+        }
+        if ($newPaths) { $env:Path = (@($sessionPaths) + @($newPaths | Select-Object -Unique)) -join ';' }
+    } catch {}
 }
+
+# --- Multi-Notebook Global Configuration Management ---
+$GlobalConfigFile = Join-Path $HOME ".terminal_notebook.json"
+
+function Get-GlobalNotebookConfig {
+    $defaultPath = Join-Path $HOME "Notes"
+    $defaultLeaf = Split-Path $defaultPath -Leaf
+    $defaultObj = @{
+        ActiveNotebook = $defaultPath
+        Notebooks = @(
+            @{ Name = $defaultLeaf; Path = $defaultPath }
+        )
+    }
+
+    if (Test-Path -LiteralPath $GlobalConfigFile) {
+        try {
+            $json = Get-Content -LiteralPath $GlobalConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            $active = if ($json.ActiveNotebook) { [string]$json.ActiveNotebook } else { $defaultPath }
+            $list = [System.Collections.Generic.List[object]]::new()
+            if ($json.Notebooks) {
+                foreach ($nb in $json.Notebooks) {
+                    if ($nb.Path) {
+                        $nbPath = [string]$nb.Path
+                        $rawName = [string]$nb.Name
+                        $cleanName = if ([string]::IsNullOrWhiteSpace($rawName) -or $rawName -eq "Default") {
+                            Split-Path $nbPath -Leaf
+                        } else {
+                            $rawName
+                        }
+                        $list.Add(@{ Name = $cleanName; Path = $nbPath })
+                    }
+                }
+            }
+            if ($list.Count -eq 0) {
+                $list.Add(@{ Name = $defaultLeaf; Path = $defaultPath })
+            }
+            return @{
+                ActiveNotebook = $active
+                Notebooks = $list.ToArray()
+            }
+        } catch {}
+    }
+    return $defaultObj
+}
+
+function Save-GlobalNotebookConfig($config) {
+    try {
+        $jsonStr = $config | ConvertTo-Json -Depth 5
+        Write-Utf8File -Path $GlobalConfigFile -Text ($jsonStr + [Environment]::NewLine)
+    } catch {}
+}
+
+function Get-ActiveNotebookName {
+    $cfg = Get-GlobalNotebookConfig
+    foreach ($nb in $cfg.Notebooks) {
+        if ($nb.Path.TrimEnd('\', '/') -eq $script:NotesDir.TrimEnd('\', '/')) {
+            $name = $nb.Name
+            if ([string]::IsNullOrWhiteSpace($name) -or $name -eq "Default") {
+                $name = Split-Path $nb.Path -Leaf
+            }
+            return $name
+        }
+    }
+    return (Split-Path $script:NotesDir -Leaf)
+}
+
+function Set-ActiveNotebook([string]$Target) {
+    if ([string]::IsNullOrWhiteSpace($Target)) { return }
+
+    $cfg = Get-GlobalNotebookConfig
+    $resolvedPath = $null
+    $matchedName = $null
+
+    # 1. Check if Target matches a registered Notebook Name
+    foreach ($nb in $cfg.Notebooks) {
+        if ($nb.Name -eq $Target -or $nb.Name.ToLower() -eq $Target.ToLower()) {
+            $resolvedPath = $nb.Path
+            $matchedName = $nb.Name
+            break
+        }
+    }
+
+    # 2. If not a named notebook, treat as path
+    if (-not $resolvedPath) {
+        if (Test-Path -LiteralPath $Target) {
+            $resolvedPath = (Get-Item -LiteralPath $Target).FullName
+        } else {
+            $homeCheck = Join-Path $HOME $Target
+            if (Test-Path -LiteralPath $homeCheck) {
+                $resolvedPath = (Get-Item -LiteralPath $homeCheck).FullName
+            } else {
+                $resolvedPath = [System.IO.Path]::GetFullPath($Target)
+            }
+        }
+        $matchedName = Split-Path $resolvedPath -Leaf
+    }
+
+    if (-not (Test-Path -LiteralPath $resolvedPath)) {
+        New-Item -ItemType Directory -Path $resolvedPath -Force | Out-Null
+    }
+
+    $script:NotesDir = $resolvedPath
+
+    # Update notebooks list in global config if not already registered
+    $existsInConfig = $false
+    $updatedList = [System.Collections.Generic.List[object]]::new()
+    foreach ($nb in $cfg.Notebooks) {
+        if ($nb.Path.TrimEnd('\', '/') -eq $resolvedPath.TrimEnd('\', '/')) {
+            $existsInConfig = $true
+        }
+        $updatedList.Add($nb)
+    }
+
+    if (-not $existsInConfig) {
+        $updatedList.Add(@{ Name = $matchedName; Path = $resolvedPath })
+    }
+
+    $cfg.ActiveNotebook = $resolvedPath
+    $cfg.Notebooks = $updatedList.ToArray()
+    Save-GlobalNotebookConfig $cfg
+
+    Load-NotebookPreferences
+}
+
+function Load-NotebookPreferences {
+    $script:CollapsedFolders = @{}
+    $script:BannerCache     = @{}
+    $script:ObsidianVaultId = $null
+    $script:LastActionPath  = $null
+    $script:SortMode        = "date"
+
+    $cfgFile = Join-Path $script:NotesDir ".config.json"
+    if (Test-Path -LiteralPath $cfgFile) {
+        try {
+            $cfg = Get-Content -LiteralPath $cfgFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($cfg.SortMode -in @("date", "alpha")) { $script:SortMode = $cfg.SortMode }
+        } catch {}
+    }
+}
+
+# --- Resolve Startup Notebook ---
+$envNotebook = if ($env:TERMINAL_NOTEBOOK_DIR) { $env:TERMINAL_NOTEBOOK_DIR } else { $env:NOTEBOOK_DIR }
+$targetStartup = if ($Notebook) { $Notebook } elseif ($envNotebook) { $envNotebook } else { $null }
+
+if ($targetStartup) {
+    Set-ActiveNotebook -Target $targetStartup
+} else {
+    $globalCfg = Get-GlobalNotebookConfig
+    $script:NotesDir = $globalCfg.ActiveNotebook
+    if (-not (Test-Path -LiteralPath $script:NotesDir)) {
+        New-Item -ItemType Directory -Path $script:NotesDir -Force | Out-Null
+    }
+    Load-NotebookPreferences
+}
+
+# --- Shared Constants ---
+$ExcludedDirPattern = '[\\/]\.(obsidian|git)([\\/]|$)'   # Matches .obsidian / .git path segments on Windows & macOS
+$CancelWords        = @("c", "cancel", ":q", "exit", "quit")
+$Utf8NoBom          = New-Object System.Text.UTF8Encoding($false)
+$AnsiRegex          = [regex]'\x1b\[[0-9;]*m'
+$AnsiTokenRegex     = [regex]'\G\x1b\[[0-9;]*m'
 
 # --- Glyph Definitions (Hex-escaped for encoding safety) ---
 $bTopLeft      = [string][char]0x250C # Top Left
@@ -42,12 +212,6 @@ $bHoriz        = [string][char]0x2500 # Horiz
 $bVert         = [string][char]0x2502 # Vert
 $bTopT         = [string][char]0x252C # Top T
 $bBotT         = [string][char]0x2534 # Bot T
-$dTopLeft      = [string][char]0x2554 # Double Top Left
-$dTopRight     = [string][char]0x2557 # Double Top Right
-$dBotLeft      = [string][char]0x255A # Double Bot Left
-$dBotRight     = [string][char]0x255D # Double Bot Right
-$dHoriz        = [string][char]0x2550 # Double Horiz
-$dVert         = [string][char]0x2551 # Double Vert
 
 # Nerd Font & Tree Glyphs
 $gFolderClosed = [string][char]0xF07B # Nerd Font folder
@@ -55,14 +219,17 @@ $gFolderOpen   = [string][char]0xF07C # Nerd Font folder open
 $gFileIcon     = [string][char]0xF15C # Nerd Font file
 $gArrowRight   = [string][char]0x25B6 # Collapsed indicator
 $gArrowDown    = [string][char]0x25BC # Expanded indicator
+$gBranchMid    = [string][char]0x251C + [string][char]0x2500 # ├─
+$gBranchEnd    = [string][char]0x2514 + [string][char]0x2500 # └─
+$gSortIcon     = [string][char]0xF0DC #  Sort icon
+$gSortAlpha    = [string][char]0xF160 #  Sort alpha
+$gSortDate     = [string][char]0xF073 #  Sort date
 
 # Markdown & Callout Glyphs
 $uRoundTL      = [string][char]0x256D # ╭
 $uRoundTR      = [string][char]0x256E # ╮
 $uRoundBL      = [string][char]0x2570 # ╰
 $uRoundBR      = [string][char]0x256F # ╯
-$uHoriz        = [string][char]0x2500 # ─
-$uVert         = [string][char]0x2502 # │
 $uBar          = [string][char]0x258C # ▌
 $uBullet       = [string][char]0x2022 # •
 $uBoxUncheck   = [string][char]0x2610 # ☐
@@ -93,8 +260,9 @@ $cWhite      = fg 255 255 255                # Crisp Pure White (Max Legibility)
 $cSilver     = fg 220 224 235                # Soft Silver (High Legibility Body Text)
 $cGray       = fg 155 160 175                # Neutral Slate Gray (Metadata & Secondary Text)
 $cDarkGray   = fg 95 100 115                 # Graphite Border Gray (Structural Borders)
-$cDeepChar   = fg 60 62 75                   # Deep Charcoal
+$cWarn       = fg 255 100 30                 # Hot Orange-Red (Warning Callouts)
 $cCodeBg     = bg 48 50 62                   # Subtle Dark Slate for Inline Code Badges
+$cHighlightBg = bg 85 60 10                  # Burnt Amber for ==highlights==
 $cSelected   = (bg 255 130 0) + (fg 0 0 0)   # High-Contrast Black on Flame Orange
 $cFolder     = fg 255 145 10                 # Warm Orange for Folders
 
@@ -110,139 +278,339 @@ function Get-GradientColor($c1, $c2, [double]$ratio) {
     return @($r, $g, $b)
 }
 
+# Borders and dividers repeat constantly, so gradient strings are memoized (case-sensitive keys)
+$script:GradientCache = [System.Collections.Generic.Dictionary[string, string]]::new()
+
 function Render-GradientText([string]$text, $c1, $c2) {
-    $len = [Math]::Max(1, $text.Length)
-    $out = ""
+    $cacheKey = "$c1|$c2|$text"
+    $cached = $null
+    if ($script:GradientCache.TryGetValue($cacheKey, [ref]$cached)) { return $cached }
+
+    $len = $text.Length
+    $sb = [System.Text.StringBuilder]::new()
     for ($i = 0; $i -lt $len; $i++) {
         $ratio = if ($len -gt 1) { $i / ($len - 1.0) } else { 0.0 }
         $rgb = Get-GradientColor $c1 $c2 $ratio
-        $out += (fg $rgb[0] $rgb[1] $rgb[2]) + $text[$i]
+        [void]$sb.Append("$esc[38;2;$($rgb[0]);$($rgb[1]);$($rgb[2])m").Append($text[$i])
     }
-    return $out + $rst
+    $result = $sb.Append($rst).ToString()
+    $script:GradientCache[$cacheKey] = $result
+    return $result
 }
 
 function Render-AuroraWave([int]$width, $c1, $c2, $c3, [string]$char) {
-    $out = ""
+    $sb = [System.Text.StringBuilder]::new()
     for ($i = 0; $i -lt $width; $i++) {
         $t = if ($width -gt 1) { $i / ($width - 1.0) } else { 0.0 }
-        $col = if ($t -lt 0.5) { 
-            Get-GradientColor $c1 $c2 ($t * 2.0) 
-        } else { 
-            Get-GradientColor $c2 $c3 (($t - 0.5) * 2.0) 
+        $col = if ($t -lt 0.5) {
+            Get-GradientColor $c1 $c2 ($t * 2.0)
+        } else {
+            Get-GradientColor $c2 $c3 (($t - 0.5) * 2.0)
         }
-        $out += (fg $col[0] $col[1] $col[2]) + $char
+        [void]$sb.Append("$esc[38;2;$($col[0]);$($col[1]);$($col[2])m").Append($char)
     }
-    return $out + $rst
+    return $sb.Append($rst).ToString()
 }
 
+# Single-character gradient bars always resolve to their first color, so render them once.
+$barLeft  = Render-GradientText $bVert $gWaveOrange $gWaveDark
+$barRight = Render-GradientText $bVert $gWaveDark $gWaveOrange
 
+# Rounded "card" borders used by frontmatter, code blocks and the folder telemetry panel
+function New-BoxTop([string]$Title, [int]$Width) {
+    $dashesRight = [Math]::Max(2, $Width - $Title.Length - 3)
+    return " " + (Render-GradientText ($uRoundTL + $bHoriz + $Title + ($bHoriz * $dashesRight) + $uRoundTR) $gWaveOrange $gWaveDark)
+}
 
-# Folder expansion state table & Preferences
-if (-not $script:ExpandedFolders) {
-    $script:ExpandedFolders = @{}
-    Get-ChildItem -Path $NotesDir -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\\.(obsidian|git)($|\\)' } | ForEach-Object {
-        $script:ExpandedFolders[$_.FullName] = $true
+function New-BoxBottom([int]$Width) {
+    return " " + (Render-GradientText ($uRoundBL + ($bHoriz * ($Width - 2)) + $uRoundBR) $gWaveOrange $gWaveDark)
+}
+
+# --- Shared Helpers ---
+function Test-CancelInput([string]$Text) {
+    return ([string]::IsNullOrWhiteSpace($Text) -or $Text.Trim().ToLower() -in $CancelWords)
+}
+
+function ConvertTo-Slug([string]$Text, [switch]$Lower) {
+    $slug = ($Text.Trim() -replace '[^\w\s-]', '' -replace '\s+', '-').Trim()
+    if ($Lower) { $slug = $slug.ToLower() }
+    return $slug
+}
+
+function Get-RelativeNotePath([string]$Path) {
+    return $Path.Substring($NotesDir.Length).TrimStart('\', '/')
+}
+
+function Write-Utf8File {
+    # BOM-less UTF-8 on every PowerShell version (Set-Content -Encoding UTF8 adds a BOM on 5.1)
+    param([string]$Path, [string]$Text, [switch]$Append)
+    if ($Append) { [System.IO.File]::AppendAllText($Path, $Text, $Utf8NoBom) }
+    else { [System.IO.File]::WriteAllText($Path, $Text, $Utf8NoBom) }
+}
+
+function Set-CursorVisible([bool]$Visible) {
+    try { [Console]::CursorVisible = $Visible } catch {}
+    if ($Visible) { [Console]::Write("$esc[?25h") } else { [Console]::Write("$esc[?25l") }
+}
+
+function Read-KeyOrResize {
+    # Blocks until a key is pressed (returns ConsoleKeyInfo) or the window is resized (returns $null)
+    $w = [Console]::WindowWidth
+    $h = [Console]::WindowHeight
+    while ($true) {
+        if ([Console]::KeyAvailable) { return [Console]::ReadKey($true) }
+        if ([Console]::WindowWidth -ne $w -or [Console]::WindowHeight -ne $h) { return $null }
+        Start-Sleep -Milliseconds 25
     }
 }
+
+function Write-ModalHeader {
+    # Default style: DarkGray rules with an orange title. -Color applies one console color to everything.
+    param([string]$Title, [string]$Color = "")
+    $rule = "=" * 50
+    $pad = " " * [Math]::Max(0, [int]((50 - $Title.Length) / 2))
+    Clear-Host
+    if ($Color) {
+        Write-Host $rule -ForegroundColor $Color
+        Write-Host ($pad + $Title) -ForegroundColor $Color
+        Write-Host $rule -ForegroundColor $Color
+    } else {
+        Write-Host $rule -ForegroundColor DarkGray
+        Write-Host ($cOrange + $pad + $Title + $rst)
+        Write-Host $rule -ForegroundColor DarkGray
+    }
+}
+
+# Folder collapse state & Preferences (folders are expanded unless explicitly collapsed)
+if ($null -eq $script:CollapsedFolders) { $script:CollapsedFolders = @{} }
 
 $notesConfigFile = Join-Path $NotesDir ".config.json"
 if (-not $script:SortMode) {
     $script:SortMode = "date"
-    if (Test-Path $notesConfigFile) {
+    if (Test-Path -LiteralPath $notesConfigFile) {
         try {
-            $cfg = Get-Content $notesConfigFile -Raw | ConvertFrom-Json
-            if ($cfg.SortMode) { $script:SortMode = $cfg.SortMode }
+            $cfg = Get-Content -LiteralPath $notesConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($cfg.SortMode -in @("date", "alpha")) { $script:SortMode = $cfg.SortMode }
         } catch {}
     }
 }
 
+# Per-run caches
+$script:BannerCache     = @{}
+$script:EditorResolved  = $false
+$script:EditorPath      = $null
+$script:ObsidianVaultId = $null
+$script:LastActionPath  = $null   # Set by create/rename prompts so the browser can re-select the item
+
 function Get-PreferredTerminalEditor {
-    $hxCmd = Get-Command hx -ErrorAction SilentlyContinue
-    if ($hxCmd -and $hxCmd.Definition) { return $hxCmd.Definition }
-    if ($IsWindows) {
-        $hxWinGet = Resolve-Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Helix.Helix*\*\hx.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($hxWinGet) { return $hxWinGet.Path }
+    if ($script:EditorResolved) { return $script:EditorPath }
+
+    $candidates = @(
+        @{ Name = "hx";    Fallback = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Helix.Helix*\*\hx.exe" },
+        @{ Name = "micro"; Fallback = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\zyedidia.micro*\*\micro.exe" },
+        @{ Name = "nvim";  Fallback = "C:\Program Files\Neovim\bin\nvim.exe" },
+        @{ Name = "nano";  Fallback = $null },
+        @{ Name = "vim";   Fallback = $null }
+    )
+
+    $script:EditorPath = $null
+    foreach ($c in $candidates) {
+        $cmd = Get-Command $c.Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($cmd -and $cmd.Definition) { $script:EditorPath = $cmd.Definition; break }
+        if ($IsWindows -and $c.Fallback) {
+            $found = Resolve-Path $c.Fallback -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $script:EditorPath = $found.Path; break }
+        }
     }
-    
-    $microCmd = Get-Command micro -ErrorAction SilentlyContinue
-    if ($microCmd -and $microCmd.Definition) { return $microCmd.Definition }
-    if ($IsWindows) {
-        $microWinGet = Resolve-Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\zyedidia.micro*\*\micro.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($microWinGet) { return $microWinGet.Path }
-    }
-    
-    $nvimCmd = Get-Command nvim -ErrorAction SilentlyContinue
-    if ($nvimCmd -and $nvimCmd.Definition) { return $nvimCmd.Definition }
-    if ($IsWindows -and (Test-Path "C:\Program Files\Neovim\bin\nvim.exe")) {
-        return "C:\Program Files\Neovim\bin\nvim.exe"
-    }
-    
-    $nanoCmd = Get-Command nano -ErrorAction SilentlyContinue
-    if ($nanoCmd -and $nanoCmd.Definition) { return $nanoCmd.Definition }
-    
-    $vimCmd = Get-Command vim -ErrorAction SilentlyContinue
-    if ($vimCmd -and $vimCmd.Definition) { return $vimCmd.Definition }
-    
-    return $null
+
+    $script:EditorResolved = $true
+    return $script:EditorPath
 }
 
 function Register-ObsidianVault {
+    if ($script:ObsidianVaultId) { return $script:ObsidianVaultId }
+
+    $vaultId = "Notes"
     $obsidianConfig = if ($IsMacOS) { "$HOME/Library/Application Support/obsidian/obsidian.json" } else { "$env:APPDATA\obsidian\obsidian.json" }
-    if (-not (Test-Path $obsidianConfig)) { return "Notes" }
 
-    try {
-        $json = Get-Content $obsidianConfig -Raw | ConvertFrom-Json
-        $foundId = $null
-        foreach ($prop in $json.vaults.PSObject.Properties) {
-            if ($prop.Value.path -eq $NotesDir) {
-                $foundId = $prop.Name
-                break
+    if (Test-Path -LiteralPath $obsidianConfig) {
+        try {
+            $json = Get-Content -LiteralPath $obsidianConfig -Raw -Encoding UTF8 | ConvertFrom-Json
+            $foundId = $null
+            foreach ($prop in $json.vaults.PSObject.Properties) {
+                if ("$($prop.Value.path)".TrimEnd('\', '/') -eq $NotesDir) {
+                    $foundId = $prop.Name
+                    break
+                }
+            }
+
+            if (-not $foundId) {
+                $foundId = [System.Guid]::NewGuid().ToString("N").Substring(0, 16)
+                $newVaultObj = [PSCustomObject]@{
+                    path = $NotesDir
+                    ts   = [int64]([System.DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+                }
+                $json.vaults | Add-Member -MemberType NoteProperty -Name $foundId -Value $newVaultObj
+                Write-Utf8File -Path $obsidianConfig -Text ($json | ConvertTo-Json -Depth 10)
+            }
+
+            $obsidianDir = Join-Path $NotesDir ".obsidian"
+            if (-not (Test-Path -LiteralPath $obsidianDir)) {
+                New-Item -ItemType Directory -Path $obsidianDir -Force | Out-Null
+            }
+
+            $vaultId = $foundId
+        } catch {
+            $vaultId = "Notes"
+        }
+    }
+
+    $script:ObsidianVaultId = $vaultId
+    return $vaultId
+}
+
+function Render-HeaderBanner([int]$width) {
+    if (-not $script:BannerCache.ContainsKey($width)) {
+        $sb = New-Object System.Text.StringBuilder
+        $titleText = " T E R M I N A L   N O T E B O O K   v$AppVersion "
+        $pad = " " * [Math]::Max(0, [int](($width - $titleText.Length) / 2))
+        [void]$sb.AppendLine($pad + (Render-GradientText $titleText $gWaveOrange $gWaveAmber))
+
+        $barWidth = [Math]::Max(10, $width - 2)
+        [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2584)))
+        $script:BannerCache[$width] = $sb.ToString().TrimEnd() + "`r`n"
+    }
+    return $script:BannerCache[$width]
+}
+
+function Switch-NotebookModal {
+    Write-ModalHeader "NOTEBOOK WORKSPACES" -Color Cyan
+    $cfg = Get-GlobalNotebookConfig
+    $notebooks = @($cfg.Notebooks)
+
+    Write-Host " Select a notebook workspace to switch to:`n" -ForegroundColor DarkGray
+
+    for ($i = 0; $i -lt $notebooks.Count; $i++) {
+        $nb = $notebooks[$i]
+        $name = if ($nb.Name -and $nb.Name -ne "Default") { $nb.Name } else { Split-Path $nb.Path -Leaf }
+        $friendlyPath = if ($nb.Path.StartsWith($HOME, [System.StringComparison]::OrdinalIgnoreCase)) {
+            "~" + $nb.Path.Substring($HOME.Length)
+        } else {
+            $nb.Path
+        }
+        $isActive = ($nb.Path.TrimEnd('\', '/') -eq $script:NotesDir.TrimEnd('\', '/'))
+        $activeBadge = if ($isActive) { "$cOrange* (Active)$rst" } else { "" }
+        $num = "[$($i + 1)]"
+        Write-Host ("  $cOrange{0,-4}$rst $cFolder$gFolderClosed $cWhite{1,-16}$rst $cGray{2,-35}$rst $activeBadge" -f $num, $name, $friendlyPath)
+    }
+
+    Write-Host "`n  $cAmber[A]$rst Add new notebook path" -ForegroundColor White
+    Write-Host "  $cWarn[R]$rst Remove notebook from list" -ForegroundColor White
+    Write-Host "  $cGray[Q/Esc]$rst Cancel`n" -ForegroundColor White
+
+    Write-Host "Choice (number/letter): " -ForegroundColor Yellow -NoNewline
+    $inputChoice = Read-Host
+
+    if (Test-CancelInput $inputChoice) { return }
+
+    if ($inputChoice.Trim().ToUpper() -eq "A") {
+        Write-Host "`nEnter Notebook Name (e.g., Work): " -ForegroundColor Yellow -NoNewline
+        $name = Read-Host
+        if (Test-CancelInput $name) { return }
+
+        Write-Host "Enter Folder Path (e.g., C:\WorkNotes): " -ForegroundColor Yellow -NoNewline
+        $path = Read-Host
+        if (Test-CancelInput $path) { return }
+
+        Set-ActiveNotebook -Target $path
+        $cfg = Get-GlobalNotebookConfig
+        $list = [System.Collections.Generic.List[object]]::new()
+        foreach ($item in $cfg.Notebooks) {
+            if ($item.Path.TrimEnd('\', '/') -eq $script:NotesDir.TrimEnd('\', '/')) {
+                $list.Add(@{ Name = $name.Trim(); Path = $script:NotesDir })
+            } else {
+                $list.Add($item)
             }
         }
+        $cfg.Notebooks = $list.ToArray()
+        Save-GlobalNotebookConfig $cfg
+        Write-Host "`nSwitched to notebook: $name ($script:NotesDir)" -ForegroundColor Green
+        Start-Sleep -Milliseconds 700
+        return
+    }
 
-        if (-not $foundId) {
-            $vaultId = [System.Guid]::NewGuid().ToString("N").Substring(0, 16)
-            $epochNow = [int64]([System.DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
-            $newVaultObj = [PSCustomObject]@{
-                path = $NotesDir
-                ts = $epochNow
+    if ($inputChoice.Trim().ToUpper() -eq "R") {
+        if ($notebooks.Count -le 1) {
+            Write-Host "`nCannot remove the only remaining notebook." -ForegroundColor Red
+            Start-Sleep -Milliseconds 900
+            return
+        }
+        Write-Host "`nEnter number of notebook to remove: " -ForegroundColor Yellow -NoNewline
+        $remIdxStr = Read-Host
+        if ($remIdxStr -match '^\d+$') {
+            $remIdx = [int]$remIdxStr - 1
+            if ($remIdx -ge 0 -and $remIdx -lt $notebooks.Count) {
+                $targetRem = $notebooks[$remIdx]
+                if ($targetRem.Path.TrimEnd('\', '/') -eq $script:NotesDir.TrimEnd('\', '/')) {
+                    Write-Host "`nCannot remove the currently active notebook. Switch to another notebook first." -ForegroundColor Red
+                    Start-Sleep -Milliseconds 1200
+                    return
+                }
+                $list = [System.Collections.Generic.List[object]]::new()
+                for ($k = 0; $k -lt $notebooks.Count; $k++) {
+                    if ($k -ne $remIdx) { $list.Add($notebooks[$k]) }
+                }
+                $cfg.Notebooks = $list.ToArray()
+                Save-GlobalNotebookConfig $cfg
+                Write-Host "`nRemoved notebook: $($targetRem.Name)" -ForegroundColor Green
+                Start-Sleep -Milliseconds 700
+                return
             }
-            $json.vaults | Add-Member -MemberType NoteProperty -Name $vaultId -Value $newVaultObj
-            $json | ConvertTo-Json -Depth 5 | Set-Content $obsidianConfig -Encoding UTF8
-            $foundId = $vaultId
         }
+        return
+    }
 
-        $obsidianDir = Join-Path $NotesDir ".obsidian"
-        if (-not (Test-Path $obsidianDir)) {
-            New-Item -ItemType Directory -Path $obsidianDir -Force | Out-Null
+    if ($inputChoice.Trim() -match '^\d+$') {
+        $idx = [int]($inputChoice.Trim()) - 1
+        if ($idx -ge 0 -and $idx -lt $notebooks.Count) {
+            $selected = $notebooks[$idx]
+            Set-ActiveNotebook -Target $selected.Path
+            Write-Host "`nSwitched to notebook: $($selected.Name)" -ForegroundColor Green
+            Start-Sleep -Milliseconds 600
         }
-
-        return $foundId
-    } catch {
-        return "Notes"
     }
 }
 
-function Render-HeaderBanner($width) {
-    $sb = New-Object System.Text.StringBuilder
-    $titleText = " T E R M I N A L   N O T E B O O K   v$AppVersion "
-    $pad = " " * [Math]::Max(0, [int](($width - $titleText.Length) / 2))
-    [void]$sb.AppendLine($pad + (Render-GradientText $titleText $gWaveOrange $gWaveAmber))
+# --- Notebook Browser ---
 
-    $barWidth = [Math]::Max(10, $width - 2)
-    [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2584)))
-    return $sb.ToString().TrimEnd() + "`r`n"
-}
+# Every hotkey shown in the nav bar. "When" limits an entry to Note/Folder selections or scrollable previews.
+$NavSpec = @(
+    @{ Key = "[W/S]";   Label = " Move " },
+    @{ Key = "[A/D]";   Label = " Folders " },
+    @{ Key = "[J/K]";   Label = " Scroll ";     When = "Scroll" },
+    @{ Key = "[T]";     Label = " Sort " },
+    @{ Key = "[B]";     Label = " Workspaces " },
+    @{ Key = "[Enter]"; Label = " Expand ";     When = "Folder" },
+    @{ Key = "[Enter]"; Label = " View ";       When = "Note" },
+    @{ Key = "[V]";     Label = " Fullscreen "; When = "Note" },
+    @{ Key = "[E]";     Label = " Edit ";       When = "Note" },
+    @{ Key = "[O]";     Label = " Obsidian ";   When = "Note" },
+    @{ Key = "[N]";     Label = " Note " },
+    @{ Key = "[F]";     Label = " Folder " },
+    @{ Key = "[U]";     Label = " Updates " },
+    @{ Key = "[R]";     Label = " Rename " },
+    @{ Key = "[X]";     Label = " Del " },
+    @{ Key = "[Q]";     Label = " Exit" }
+)
 
 function Open-InObsidian {
     param([System.IO.FileInfo]$File)
-    if (-not $File -or -not (Test-Path $File.FullName)) { return }
+    if (-not $File -or -not (Test-Path -LiteralPath $File.FullName)) { return }
 
-    $vaultId = Register-ObsidianVault
-    $targetVault = if ($vaultId) { $vaultId } else { "Notes" }
+    $targetVault = Register-ObsidianVault
 
     # Compute vault-relative path using forward slashes
-    $relPath = $File.FullName.Substring($NotesDir.Length).TrimStart('\', '/').Replace('\', '/')
+    $relPath = (Get-RelativeNotePath $File.FullName).Replace('\', '/')
     $encodedFile = [System.Uri]::EscapeDataString($relPath)
     $uri = "obsidian://open?vault=$targetVault&file=$encodedFile"
     try {
@@ -263,68 +631,86 @@ function Open-InObsidian {
     } catch {}
 }
 
+function ConvertTo-WtArg([string]$Arg, [switch]$AlwaysQuote) {
+    # wt.exe treats ';' as a command separator, so it must be escaped even inside quotes
+    $a = $Arg -replace ';', '\;'
+    if ($AlwaysQuote -or $a -match '\s') { return "`"$a`"" }
+    return $a
+}
+
 function Invoke-TerminalEditor {
     param(
         [string]$EditorPath,
         [string]$FilePath,
         [switch]$GoToEnd
     )
-    if (-not (Test-Path $FilePath)) { return }
+    if (-not (Test-Path -LiteralPath $FilePath)) { return }
 
     $edLeaf = Split-Path $EditorPath -Leaf
 
-    $rawLines = Get-Content -Path $FilePath -Raw
-    $lastLine = if ($rawLines) { [Math]::Max(1, $rawLines.Split([char]10).Count) } else { 1 }
+    $lastLine = 1
+    if ($GoToEnd) {
+        $lastLine = [Math]::Max(1, [System.IO.File]::ReadAllText($FilePath).Split([char]10).Count)
+    }
 
     $edArgs = @()
-    if ($edLeaf -match 'hx') {
+    if ($edLeaf -match 'micro') {
+        $edArgs += @("-colorscheme", "simple", "-softwrap", "true", "-wordwrap", "true", $FilePath)
         if ($GoToEnd) { $edArgs += "+$lastLine" }
-        $edArgs += "$FilePath"
-    } elseif ($edLeaf -match 'micro') {
-        $edArgs += @("-colorscheme", "simple", "-softwrap", "true", "-wordwrap", "true", "$FilePath")
-        if ($GoToEnd) { $edArgs += "+$lastLine" }
-    } elseif ($edLeaf -match 'nvim|vim|nano') {
-        if ($GoToEnd) { $edArgs += "+$lastLine" }
-        $edArgs += "$FilePath"
     } else {
-        $edArgs += "$FilePath"
+        if ($GoToEnd -and $edLeaf -match 'hx|vim|nano') { $edArgs += "+$lastLine" }
+        $edArgs += $FilePath
     }
 
     # Version 2.0: Windows Terminal Seamless Split-Pane Editing
     if ($env:WT_SESSION) {
         # We are inside modern Windows Terminal. Split the pane vertically so the user keeps the tree visible!
-        
-        # Manually quote arguments that contain spaces to safely pass the string to Windows Terminal
-        $safeArgs = $edArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }
-        $wtArgsString = "-w 0 split-pane -V `"$EditorPath`" " + ($safeArgs -join " ")
+        $wtArgsString = "-w 0 split-pane -V " + (ConvertTo-WtArg $EditorPath -AlwaysQuote) + " " +
+                        (($edArgs | ForEach-Object { ConvertTo-WtArg $_ }) -join " ")
         Start-Process -FilePath "wt.exe" -ArgumentList $wtArgsString
-        
+
         # Sleep to allow Windows Terminal to complete the PTY split and resize event.
         # This prevents the Notebook Browser from re-rendering the UI with the old full width,
         # which would cause catastrophic line wrapping as the window shrinks!
         Start-Sleep -Milliseconds 800
-        
+
         # Return instantly. The left pane (Terminal Notebook) stays fully interactive while the right pane edits!
         return
     }
 
-    # Fallback for old consolehost: block and run in-place
+    # Fallback for old consolehost / macOS: block and run in-place.
+    # NOTE: callers must never capture this function's output (e.g. $x = ...), or the editor loses its TTY.
     & $EditorPath @edArgs
 }
 
-function Get-AllNotes {
-    $raw = Get-ChildItem -Path $NotesDir -Filter "*.md" -Recurse -File | Where-Object { $_.FullName -notmatch '\\\.(obsidian|git)($|\\)' }
-    if ($script:SortMode -eq "alpha") {
-        return $raw | Sort-Object { Format-NoteTitle $_ }
+# --- Note Discovery & Sorting ---
+$DateSortKey = {
+    if ($_.BaseName -match '^(\d{4}-\d{2}-\d{2})') {
+        $matches[1] + " " + $_.CreationTime.ToString("HH:mm:ss")
     } else {
-        return $raw | Sort-Object { 
-            if ($_.BaseName -match '^(\d{4}-\d{2}-\d{2})') { 
-                $matches[1] + " " + $_.CreationTime.ToString("HH:mm:ss")
-            } else { 
-                $_.CreationTime.ToString("yyyy-MM-dd HH:mm:ss") 
-            } 
-        } -Descending
+        $_.CreationTime.ToString("yyyy-MM-dd HH:mm:ss")
     }
+}
+
+function Sort-NoteFiles($Files) {
+    if ($script:SortMode -eq "alpha") { return $Files | Sort-Object { Format-NoteTitle $_ } }
+    return $Files | Sort-Object $DateSortKey -Descending
+}
+
+function Sort-NoteFolders($Dirs) {
+    if ($script:SortMode -eq "alpha") { return $Dirs | Sort-Object Name }
+    return $Dirs | Sort-Object CreationTime -Descending
+}
+
+function Get-NoteFolders {
+    return @(Get-ChildItem -LiteralPath $NotesDir -Directory -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch $ExcludedDirPattern })
+}
+
+function Get-AllNotes {
+    $raw = Get-ChildItem -LiteralPath $NotesDir -Filter "*.md" -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch $ExcludedDirPattern }
+    return @(Sort-NoteFiles $raw)
 }
 
 function Format-NoteTitle {
@@ -338,10 +724,37 @@ function Format-NoteTitle {
 
 function Truncate-String {
     param([string]$Str, [int]$MaxLen)
-    if ([string]::IsNullOrEmpty($Str)) { return "" }
+    if ([string]::IsNullOrEmpty($Str) -or $MaxLen -le 0) { return "" }
     if ($Str.Length -le $MaxLen) { return $Str }
     if ($MaxLen -le 3) { return $Str.Substring(0, $MaxLen) }
     return $Str.Substring(0, $MaxLen - 3) + "..."
+}
+
+function Limit-AnsiText([string]$Text, [int]$Width) {
+    # Truncates to $Width visible characters while keeping ANSI color sequences intact
+    $sb = [System.Text.StringBuilder]::new()
+    $visible = 0
+    $i = 0
+    while ($i -lt $Text.Length -and $visible -lt $Width) {
+        $m = $AnsiTokenRegex.Match($Text, $i)
+        if ($m.Success) {
+            [void]$sb.Append($m.Value)
+            $i += $m.Length
+        } else {
+            [void]$sb.Append($Text[$i])
+            $visible++
+            $i++
+        }
+    }
+    return $sb.ToString()
+}
+
+function Format-AnsiCell([string]$Text, [int]$Width) {
+    # Fits an ANSI-colored line into exactly $Width visible columns (truncating or padding)
+    if ([string]::IsNullOrEmpty($Text)) { return " " * $Width }
+    $visible = $AnsiRegex.Replace($Text, '').Length
+    if ($visible -gt $Width) { return (Limit-AnsiText $Text $Width) + $rst }
+    return $Text + $rst + (" " * ($Width - $visible))
 }
 
 function Format-WordWrap {
@@ -353,20 +766,19 @@ function Format-WordWrap {
     if ([string]::IsNullOrEmpty($Text)) { return @("") }
     if ($Text.Length -le $Width) { return @($Text) }
 
-    $wrappedLines = @()
-    $words = $Text -split '\s+'
+    $wrappedLines = [System.Collections.Generic.List[string]]::new()
     $currentLine = ""
 
-    foreach ($w in $words) {
+    foreach ($w in ($Text -split '\s+')) {
         if ([string]::IsNullOrEmpty($w)) { continue }
         if ([string]::IsNullOrEmpty($currentLine)) {
             $currentLine = $w
         } elseif (($currentLine.Length + 1 + $w.Length) -le $Width) {
             $currentLine += " " + $w
         } else {
-            $wrappedLines += $currentLine
+            $wrappedLines.Add($currentLine)
             while ($w.Length -gt $Width) {
-                $wrappedLines += $w.Substring(0, $Width)
+                $wrappedLines.Add($w.Substring(0, $Width))
                 $w = $w.Substring($Width)
             }
             $currentLine = $w
@@ -374,10 +786,10 @@ function Format-WordWrap {
     }
 
     if (-not [string]::IsNullOrEmpty($currentLine)) {
-        $wrappedLines += $currentLine
+        $wrappedLines.Add($currentLine)
     }
 
-    return $wrappedLines
+    return $wrappedLines.ToArray()
 }
 
 # --- Obsidian-Style Terminal Markdown Engine ---
@@ -385,56 +797,58 @@ function Format-MarkdownInline {
     param([string]$Text)
     if ([string]::IsNullOrEmpty($Text)) { return "" }
 
-    $res = $Text
+    # 1. Inline code: `code` - swapped for placeholders first so no other rule touches code contents
+    $codeSpans = [System.Collections.Generic.List[string]]::new()
+    $res = [regex]::Replace($Text, '`([^`]+)`', {
+        param($m)
+        $codeSpans.Add("$cCodeBg$cAmber $($m.Groups[1].Value) $rst$cSilver")
+        return "$([char]1)$($codeSpans.Count - 1)$([char]1)"
+    })
 
-    # 1. Obsidian WikiLinks: [[Target]] or [[Target|Label]]
+    # 2. Obsidian WikiLinks: [[Target]] or [[Target|Label]]
     $res = [regex]::Replace($res, '\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]', {
         param($m)
         $label = if ($m.Groups[2].Success -and -not [string]::IsNullOrEmpty($m.Groups[2].Value)) { $m.Groups[2].Value } else { $m.Groups[1].Value }
         return "$cAmber[[$cOrange$label$cAmber]]$rst$cSilver"
     })
 
-    # 2. Standard Markdown Links: [Label](url)
+    # 3. Standard Markdown Links: [Label](url)
     $res = [regex]::Replace($res, '\[([^\]]+)\]\(([^)]+)\)', {
         param($m)
-        $label = $m.Groups[1].Value
-        return "$cOrange$label$cDarkGray$uArrowUpR$rst$cSilver"
+        return "$cOrange$($m.Groups[1].Value)$cDarkGray$uArrowUpR$rst$cSilver"
     })
 
-    # 3. Inline code: `code`
-    $res = [regex]::Replace($res, '`([^`]+)`', {
+    # 4. Bold: **text** or __text__ (underscores must not be inside a word, e.g. snake__case)
+    $res = [regex]::Replace($res, '\*\*(?<b>.+?)\*\*|(?<!\w)__(?<b>.+?)__(?!\w)', {
         param($m)
-        $c = $m.Groups[1].Value
-        return "$cCodeBg$cAmber $c $rst$cSilver"
-    })
-
-    # 4. Bold: **text** or __text__
-    $res = [regex]::Replace($res, '(?:\*\*|__)(.*?)(?:\*\*|__)', {
-        param($m)
-        $b = $m.Groups[1].Value
-        return "$cWhite$sBold$b$sNoBold$cSilver"
+        return "$cWhite$sBold$($m.Groups['b'].Value)$sNoBold$cSilver"
     })
 
     # 5. Obsidian Highlight: ==text==
     $res = [regex]::Replace($res, '==(.*?)==', {
         param($m)
-        $h = $m.Groups[1].Value
-        return "$esc[48;2;85;60;10m$cOrange $h $rst$cSilver"
+        return "$cHighlightBg$cOrange $($m.Groups[1].Value) $rst$cSilver"
     })
 
     # 6. Italic: *text*
     $res = [regex]::Replace($res, '(?<!\*)\*([^\*]+)\*(?!\*)', {
         param($m)
-        $it = $m.Groups[1].Value
-        return "$sItalic$it$sNoItalic"
+        return "$sItalic$($m.Groups[1].Value)$sNoItalic"
     })
 
     # 7. Strikethrough: ~~text~~
     $res = [regex]::Replace($res, '~~(.*?)~~', {
         param($m)
-        $st = $m.Groups[1].Value
-        return "$cGray$sStrike$st$sNoStrike$cSilver"
+        return "$cGray$sStrike$($m.Groups[1].Value)$sNoStrike$cSilver"
     })
+
+    # Restore protected code spans
+    if ($codeSpans.Count -gt 0) {
+        $res = [regex]::Replace($res, '\x01(\d+)\x01', {
+            param($m)
+            return $codeSpans[[int]$m.Groups[1].Value]
+        })
+    }
 
     return $res
 }
@@ -447,102 +861,80 @@ function Convert-MarkdownToTerminalLines {
 
     if (-not $RawLines -or $RawLines.Count -eq 0) { return @() }
 
-    $out = @()
+    $out = [System.Collections.Generic.List[string]]::new()
+    $boxW = [Math]::Max(20, $Width - 2)
     $inCodeBlock = $false
-    $codeLang = ""
-    $inFrontmatter = $false
-    $frontmatterLines = @()
+    $activeCalloutColor = $null
     $lineIdx = 0
 
-    # 1. Parse YAML Frontmatter / Obsidian Properties Card
-    if ($RawLines.Count -gt 0 -and $RawLines[0].Trim() -eq "---") {
-        $inFrontmatter = $true
-        $lineIdx = 1
-        while ($lineIdx -lt $RawLines.Count) {
-            $fLine = $RawLines[$lineIdx]
-            if ($fLine.Trim() -eq "---") {
-                $lineIdx++
-                $inFrontmatter = $false
-                break
-            }
-            $frontmatterLines += $fLine
-            $lineIdx++
-        }
+    function Add-BlankLine {
+        if ($out.Count -gt 0 -and $out[$out.Count - 1] -ne "") { $out.Add("") }
+    }
 
-        if ($frontmatterLines.Count -gt 0) {
-            $titleStr = " Properties "
-            $boxW = [Math]::Max(20, $Width - 2)
-            $dashesLeft = 1
-            $dashesRight = [Math]::Max(2, $boxW - $titleStr.Length - $dashesLeft - 2)
-            $topBorderStr = $uRoundTL + ($uHoriz * $dashesLeft) + $titleStr + ($uHoriz * $dashesRight) + $uRoundTR
-            $out += " " + (Render-GradientText $topBorderStr $gWaveOrange $gWaveDark)
-
-            $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
-            $rightBar = Render-GradientText $uVert $gWaveDark $gWaveOrange
-
-            foreach ($fl in $frontmatterLines) {
-                if ($fl -match '^\s*([A-Za-z0-9_-]+)\s*:\s*(.*)') {
-                    $key = $matches[1]
-                    $val = $matches[2].Trim('"', "'", ' ')
-                    $valDisp = if ($val) { $val } else { "" }
-                    if ($valDisp.Length -gt ($boxW - 14)) { $valDisp = $valDisp.Substring(0, $boxW - 17) + "..." }
-                    $keyPad = "{0,-8}" -f $key
-                    $contentLen = 11 + $valDisp.Length
-                    $padLen = [Math]::Max(0, $boxW - 2 - $contentLen)
-                    $pad = " " * $padLen
-                    $out += " " + $leftBar + " " + $cGray + $keyPad + $cDarkGray + ": " + $cWhite + (Format-MarkdownInline $valDisp) + $pad + $rightBar
-                } elseif ($fl -match '^\s*-\s+(.*)') {
-                    $itemText = $matches[1]
-                    if ($itemText.Length -gt ($boxW - 11)) { $itemText = $itemText.Substring(0, $boxW - 14) + "..." }
-                    $contentLen = 5 + $itemText.Length
-                    $padLen = [Math]::Max(0, $boxW - 2 - $contentLen)
-                    $pad = " " * $padLen
-                    $out += " " + $leftBar + "   " + $cAmber + "$uBullet " + $cSilver + (Format-MarkdownInline $itemText) + $pad + $rightBar
-                }
-            }
-            $botBorderStr = $uRoundBL + ($uHoriz * ($boxW - 2)) + $uRoundBR
-            $out += " " + (Render-GradientText $botBorderStr $gWaveOrange $gWaveDark)
-            $out += ""
+    # Word-wraps $Text and emits it with a first-line prefix and a continuation prefix
+    function Add-Wrapped([string]$Text, [int]$WrapWidth, [string]$FirstPrefix, [string]$ContPrefix, [string]$Style = "", [string]$StyleEnd = "") {
+        $wrapped = @(Format-WordWrap -Text $Text -Width $WrapWidth)
+        for ($k = 0; $k -lt $wrapped.Count; $k++) {
+            $prefix = if ($k -eq 0) { $FirstPrefix } else { $ContPrefix }
+            $out.Add($prefix + $Style + (Format-MarkdownInline $wrapped[$k]) + $StyleEnd + $rst)
         }
     }
 
-    $activeCalloutType = $null
-    $activeCalloutColor = $null
+    # 1. Parse YAML Frontmatter / Obsidian Properties Card
+    if ($RawLines[0].Trim() -eq "---") {
+        $frontmatter = [System.Collections.Generic.List[string]]::new()
+        $lineIdx = 1
+        while ($lineIdx -lt $RawLines.Count) {
+            $fLine = $RawLines[$lineIdx]
+            $lineIdx++
+            if ($fLine.Trim() -eq "---") { break }
+            $frontmatter.Add($fLine)
+        }
+
+        if ($frontmatter.Count -gt 0) {
+            $out.Add((New-BoxTop " Properties " $boxW))
+
+            foreach ($fl in $frontmatter) {
+                if ($fl -match '^\s*([A-Za-z0-9_-]+)\s*:\s*(.*)') {
+                    $keyPad = "{0,-8}" -f $matches[1]
+                    $valDisp = $matches[2].Trim('"', "'", ' ')
+                    if ($valDisp.Length -gt ($boxW - 14)) { $valDisp = $valDisp.Substring(0, $boxW - 17) + "..." }
+                    $pad = " " * [Math]::Max(0, $boxW - 2 - (11 + $valDisp.Length))
+                    $out.Add(" " + $barLeft + " " + $cGray + $keyPad + $cDarkGray + ": " + $cWhite + (Format-MarkdownInline $valDisp) + $pad + $barRight)
+                } elseif ($fl -match '^\s*-\s+(.*)') {
+                    $itemText = $matches[1]
+                    if ($itemText.Length -gt ($boxW - 11)) { $itemText = $itemText.Substring(0, $boxW - 14) + "..." }
+                    $pad = " " * [Math]::Max(0, $boxW - 2 - (5 + $itemText.Length))
+                    $out.Add(" " + $barLeft + "   " + $cAmber + "$uBullet " + $cSilver + (Format-MarkdownInline $itemText) + $pad + $barRight)
+                }
+            }
+
+            $out.Add((New-BoxBottom $boxW))
+            $out.Add("")
+        }
+    }
 
     for ($i = $lineIdx; $i -lt $RawLines.Count; $i++) {
         $line = $RawLines[$i]
 
         # Fenced Code Blocks (```powershell)
         if ($line -match '^\s*```([A-Za-z0-9_-]*)') {
-            $boxW = [Math]::Max(20, $Width - 2)
             if (-not $inCodeBlock) {
                 $inCodeBlock = $true
-                $codeLang = $matches[1]
-                $tag = if ($codeLang) { " $codeLang " } else { " Code " }
-                $dashesLeft = 1
-                $dashesRight = [Math]::Max(2, $boxW - $tag.Length - $dashesLeft - 2)
-                $topBorderStr = $uRoundTL + ($uHoriz * $dashesLeft) + $tag + ($uHoriz * $dashesRight) + $uRoundTR
-                $out += " " + (Render-GradientText $topBorderStr $gWaveOrange $gWaveDark)
+                $tag = if ($matches[1]) { " $($matches[1]) " } else { " Code " }
+                $out.Add((New-BoxTop $tag $boxW))
             } else {
                 $inCodeBlock = $false
-                $botBorderStr = $uRoundBL + ($uHoriz * ($boxW - 2)) + $uRoundBR
-                $out += " " + (Render-GradientText $botBorderStr $gWaveOrange $gWaveDark)
+                $out.Add((New-BoxBottom $boxW))
             }
             continue
         }
 
         if ($inCodeBlock) {
-            $boxW = [Math]::Max(20, $Width - 2)
-            $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
-            $rightBar = Render-GradientText $uVert $gWaveDark $gWaveOrange
             $codeStr = $line
-            if ($codeStr.Length -gt ($boxW - 4)) {
-                $codeStr = $codeStr.Substring(0, $boxW - 4)
-            }
-            $contentLen = 2 + $codeStr.Length
-            $padLen = [Math]::Max(0, $boxW - 2 - $contentLen)
-            $pad = " " * $padLen
-            $out += " " + $leftBar + " " + $cAmber + $codeStr + $pad + " " + $rightBar
+            if ($codeStr.Length -gt ($boxW - 4)) { $codeStr = $codeStr.Substring(0, $boxW - 4) }
+            $pad = " " * [Math]::Max(0, $boxW - 4 - $codeStr.Length)
+            $out.Add(" " + $barLeft + " " + $cAmber + $codeStr + $pad + " " + $barRight)
             continue
         }
 
@@ -550,106 +942,76 @@ function Convert-MarkdownToTerminalLines {
         if ($line -match '^\s*>\s*\[!([A-Za-z0-9_-]+)\]\s*(.*)') {
             $cType = $matches[1].ToUpper()
             $cTitle = $matches[2]
-            $color = $cOrange
-            switch ($cType) {
-                { $_ -in @("TIP", "HINT", "SUCCESS", "DONE") } { $color = $cAmber }
-                { $_ -in @("WARNING", "CAUTION", "DANGER", "BUG") } { $color = fg 255 100 30 }
-                { $_ -in @("TODO", "QUESTION", "HELP") } { $color = $cSilver }
+            $activeCalloutColor = switch ($cType) {
+                { $_ -in @("TIP", "HINT", "SUCCESS", "DONE") }      { $cAmber }
+                { $_ -in @("WARNING", "CAUTION", "DANGER", "BUG") } { $cWarn }
+                { $_ -in @("TODO", "QUESTION", "HELP") }            { $cSilver }
+                default                                             { $cOrange }
             }
-            $activeCalloutType = $cType
-            $activeCalloutColor = $color
             $hdr = if ($cTitle) { "$cType - $cTitle" } else { $cType }
-            $out += (" " + $color + "$uBar " + $cWhite + $sBold + $hdr + $sNoBold + $rst)
+            $out.Add(" " + $activeCalloutColor + "$uBar " + $cWhite + $sBold + $hdr + $sNoBold + $rst)
             continue
         }
 
-        if ($activeCalloutType -and $line -match '^\s*>\s*(.*)') {
-            $cBody = $matches[1]
-            $wrapped = @(Format-WordWrap -Text $cBody -Width ($Width - 5))
-            foreach ($wb in $wrapped) {
-                $out += (" " + $activeCalloutColor + "$uBar " + $cSilver + (Format-MarkdownInline $wb) + $rst)
-            }
+        if ($activeCalloutColor -and $line -match '^\s*>\s*(.*)') {
+            Add-Wrapped $matches[1] ($Width - 5) (" " + $activeCalloutColor + "$uBar " + $cSilver) (" " + $activeCalloutColor + "$uBar " + $cSilver)
             continue
-        } else {
-            $activeCalloutType = $null
-            $activeCalloutColor = $null
         }
+        $activeCalloutColor = $null
 
         # Standard Blockquotes
         if ($line -match '^\s*>\s*(.*)') {
-            $qBody = $matches[1]
-            $wrapped = @(Format-WordWrap -Text $qBody -Width ($Width - 5))
-            $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
-            foreach ($wb in $wrapped) {
-                $out += (" " + $leftBar + " " + $sItalic + $cSilver + (Format-MarkdownInline $wb) + $sNoItalic + $rst)
-            }
+            $quotePrefix = " " + $barLeft + " " + $sItalic + $cSilver
+            Add-Wrapped $matches[1] ($Width - 5) $quotePrefix $quotePrefix "" $sNoItalic
             continue
         }
 
         # Checklists / Tasks
         if ($line -match '^\s*-\s+\[\s\]\s+(.*)') {
-            $taskText = $matches[1]
-            $wrapped = @(Format-WordWrap -Text $taskText -Width ($Width - 6))
-            if ($wrapped.Count -gt 0) {
-                $out += ("  " + $cOrange + "$uBoxUncheck " + $cWhite + (Format-MarkdownInline $wrapped[0]) + $rst)
-                for ($k = 1; $k -lt $wrapped.Count; $k++) {
-                    $out += ("    " + $cSilver + (Format-MarkdownInline $wrapped[$k]) + $rst)
-                }
-            }
+            Add-Wrapped $matches[1] ($Width - 6) ("  " + $cOrange + "$uBoxUncheck " + $cWhite) ("    " + $cSilver)
             continue
         }
 
         if ($line -match '^\s*-\s+\[[xX]\]\s+(.*)') {
-            $taskText = $matches[1]
-            $wrapped = @(Format-WordWrap -Text $taskText -Width ($Width - 6))
-            if ($wrapped.Count -gt 0) {
-                $out += ("  " + $cAmber + "$uCheckMark " + $cGray + $sStrike + (Format-MarkdownInline $wrapped[0]) + $sNoStrike + $rst)
-                for ($k = 1; $k -lt $wrapped.Count; $k++) {
-                    $out += ("    " + $cGray + $sStrike + (Format-MarkdownInline $wrapped[$k]) + $sNoStrike + $rst)
-                }
-            }
+            Add-Wrapped $matches[1] ($Width - 6) ("  " + $cAmber + "$uCheckMark " + $cGray) ("    " + $cGray) $sStrike $sNoStrike
             continue
         }
 
-        # Headings
-        if ($line -match '^#\s+(.*)') {
-            $hText = $matches[1]
-            if ($out.Count -gt 0 -and -not [string]::IsNullOrEmpty($out[-1])) { $out += "" }
-            $out += (" " + $cOrange + "# " + $cWhite + $sBold + (Format-MarkdownInline $hText) + $sNoBold + $rst)
-            $divLen = [Math]::Min($Width - 2, [Math]::Max(12, $hText.Length + 4))
-            $out += " " + (Render-GradientText ($uHoriz * $divLen) $gWaveOrange $gWaveDark)
-            continue
-        }
-        if ($line -match '^##\s+(.*)') {
-            $hText = $matches[1]
-            if ($out.Count -gt 0 -and -not [string]::IsNullOrEmpty($out[-1])) { $out += "" }
-            $out += (" " + $cOrange + "## " + $cWhite + $sBold + (Format-MarkdownInline $hText) + $sNoBold + $rst)
-            continue
-        }
-        if ($line -match '^###\s+(.*)') {
-            $hText = $matches[1]
-            if ($out.Count -gt 0 -and -not [string]::IsNullOrEmpty($out[-1])) { $out += "" }
-            $out += (" " + $cAmber + "### " + $cSilver + $sBold + (Format-MarkdownInline $hText) + $sNoBold + $rst)
-            continue
-        }
-        if ($line -match '^####\s+(.*)') {
-            $hText = $matches[1]
-            $out += (" " + $cGray + "#### " + $cSilver + (Format-MarkdownInline $hText) + $rst)
+        # Headings (# through ####)
+        if ($line -match '^(#{1,4})\s+(.*)') {
+            $hLevel = $matches[1].Length
+            $hText = Format-MarkdownInline $matches[2]
+            switch ($hLevel) {
+                1 {
+                    Add-BlankLine
+                    $out.Add(" " + $cOrange + "# " + $cWhite + $sBold + $hText + $sNoBold + $rst)
+                    $divLen = [Math]::Min($Width - 2, [Math]::Max(12, $matches[2].Length + 4))
+                    $out.Add(" " + (Render-GradientText ($bHoriz * $divLen) $gWaveOrange $gWaveDark))
+                }
+                2 {
+                    Add-BlankLine
+                    $out.Add(" " + $cOrange + "## " + $cWhite + $sBold + $hText + $sNoBold + $rst)
+                }
+                3 {
+                    Add-BlankLine
+                    $out.Add(" " + $cAmber + "### " + $cSilver + $sBold + $hText + $sNoBold + $rst)
+                }
+                4 {
+                    $out.Add(" " + $cGray + "#### " + $cSilver + $hText + $rst)
+                }
+            }
             continue
         }
 
         # Markdown Tables: | Col1 | Col2 |
         if ($line -match '^\s*\|(.+)\|\s*$') {
             $inner = $matches[1]
-            $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
-            $rightBar = Render-GradientText $uVert $gWaveDark $gWaveOrange
             if ($inner -match '^[\s\-:|]+$') {
                 $midLen = [Math]::Min($Width - 4, 45)
-                $midStr = $uMidLeft + ($uHoriz * $midLen) + $uMidRight
-                $out += " " + (Render-GradientText $midStr $gWaveOrange $gWaveDark)
+                $out.Add(" " + (Render-GradientText ($uMidLeft + ($bHoriz * $midLen) + $uMidRight) $gWaveOrange $gWaveDark))
             } else {
-                $cells = $inner -split '\|' | ForEach-Object { (Format-MarkdownInline $_.Trim()) }
-                $out += " " + $leftBar + " " + ($cells -join (" " + $leftBar + " ")) + " " + $rightBar
+                $cells = foreach ($cell in ($inner -split '\|')) { Format-MarkdownInline $cell.Trim() }
+                $out.Add(" " + $barLeft + " " + ($cells -join (" " + $barLeft + " ")) + " " + $barRight)
             }
             continue
         }
@@ -657,312 +1019,315 @@ function Convert-MarkdownToTerminalLines {
         # Horizontal Rules
         if ($line -match '^(---|\*\*\*|___)\s*$') {
             $hrLen = [Math]::Min(50, $Width - 2)
-            $out += " " + (Render-GradientText ($uHoriz * $hrLen) $gWaveOrange $gWaveDark)
+            $out.Add(" " + (Render-GradientText ($bHoriz * $hrLen) $gWaveOrange $gWaveDark))
             continue
         }
 
         # Bullet Lists
         if ($line -match '^\s*[-*+]\s+(.*)') {
-            $bText = $matches[1]
-            $wrapped = @(Format-WordWrap -Text $bText -Width ($Width - 5))
-            if ($wrapped.Count -gt 0) {
-                $out += ("  " + $cAmber + "$uBullet " + $cSilver + (Format-MarkdownInline $wrapped[0]) + $rst)
-                for ($k = 1; $k -lt $wrapped.Count; $k++) {
-                    $out += ("    " + $cSilver + (Format-MarkdownInline $wrapped[$k]) + $rst)
-                }
-            }
+            Add-Wrapped $matches[1] ($Width - 5) ("  " + $cAmber + "$uBullet " + $cSilver) ("    " + $cSilver)
             continue
         }
 
         # Numbered Lists
         if ($line -match '^\s*(\d+\.)\s+(.*)') {
-            $nNum = $matches[1]
-            $nText = $matches[2]
-            $wrapped = @(Format-WordWrap -Text $nText -Width ($Width - 6))
-            if ($wrapped.Count -gt 0) {
-                $out += ("  " + $cOrange + $nNum + " " + $cSilver + (Format-MarkdownInline $wrapped[0]) + $rst)
-                for ($k = 1; $k -lt $wrapped.Count; $k++) {
-                    $out += ("     " + $cSilver + (Format-MarkdownInline $wrapped[$k]) + $rst)
-                }
-            }
+            Add-Wrapped $matches[2] ($Width - 6) ("  " + $cOrange + $matches[1] + " " + $cSilver) ("     " + $cSilver)
             continue
         }
 
         # Empty line
         if ([string]::IsNullOrWhiteSpace($line)) {
-            if ($out.Count -gt 0 -and -not [string]::IsNullOrEmpty($out[-1])) {
-                $out += ""
-            }
+            Add-BlankLine
             continue
         }
 
         # Regular Paragraph
-        $wrapped = @(Format-WordWrap -Text $line -Width ($Width - 2))
-        foreach ($wl in $wrapped) {
-            $out += (" " + $cSilver + (Format-MarkdownInline $wl) + $rst)
+        Add-Wrapped $line ($Width - 2) (" " + $cSilver) (" " + $cSilver)
+    }
+
+    return $out.ToArray()
+}
+
+# --- Notebook Index (single disk scan) & Tree Builder ---
+function Get-NotebookIndex {
+    # One recursive pass collects every folder and note, then aggregates recursive note counts per folder.
+    $root = (Get-Item -LiteralPath $NotesDir).FullName
+    $childDirs  = @{}   # parent path -> List of DirectoryInfo
+    $childFiles = @{}   # parent path -> List of FileInfo
+    $noteCounts = @{}   # folder path -> recursive .md count
+
+    foreach ($d in (Get-NoteFolders)) {
+        $parent = $d.Parent.FullName
+        if (-not $childDirs.ContainsKey($parent)) { $childDirs[$parent] = [System.Collections.Generic.List[object]]::new() }
+        $childDirs[$parent].Add($d)
+    }
+
+    $files = Get-ChildItem -LiteralPath $root -Filter "*.md" -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch $ExcludedDirPattern }
+    foreach ($f in $files) {
+        $dir = $f.DirectoryName
+        if (-not $childFiles.ContainsKey($dir)) { $childFiles[$dir] = [System.Collections.Generic.List[object]]::new() }
+        $childFiles[$dir].Add($f)
+
+        while ($dir -and $dir.Length -gt $root.Length) {
+            $noteCounts[$dir] = [int]$noteCounts[$dir] + 1
+            $dir = [System.IO.Path]::GetDirectoryName($dir)
         }
     }
 
-    return $out
+    return @{ Root = $root; ChildDirs = $childDirs; ChildFiles = $childFiles; NoteCounts = $noteCounts }
 }
 
-# --- Recursive Tree Builder ---
-function Build-NotebookTreeItems {
-    param(
-        [string]$CurrentPath,
-        [int]$Level = 0
-    )
-
-    $items = @()
+function Add-TreeItems {
+    # Appends the visible (expanded) hierarchy under $Path to the $Items list
+    param([hashtable]$Index, [string]$Path, [int]$Level, $Items)
 
     # 1. Subfolders first (sorted by SortMode: date or alpha)
-    $rawSubDirs = Get-ChildItem -Path $CurrentPath -Directory -ErrorAction SilentlyContinue | 
-                  Where-Object { $_.Name -notmatch '^\.(obsidian|git)$' }
-
-    if ($script:SortMode -eq "alpha") {
-        $subDirs = $rawSubDirs | Sort-Object Name
-    } else {
-        # Default: date (creation date descending)
-        $subDirs = $rawSubDirs | Sort-Object CreationTime -Descending
-    }
-
+    $subDirs = @(Sort-NoteFolders $Index.ChildDirs[$Path])
     foreach ($d in $subDirs) {
-        $isExpanded = $script:ExpandedFolders.ContainsKey($d.FullName) -and $script:ExpandedFolders[$d.FullName]
-        $noteCount = (Get-ChildItem -Path $d.FullName -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue | Measure-Object).Count
-
-        $folderItem = [PSCustomObject]@{
+        $isExpanded = -not $script:CollapsedFolders.ContainsKey($d.FullName)
+        $Items.Add([PSCustomObject]@{
             Type        = "Folder"
             Name        = $d.Name
             FullName    = $d.FullName
             Level       = $Level
             IsExpanded  = $isExpanded
-            ItemCount   = $noteCount
-        }
-        $items += $folderItem
+            ItemCount   = [int]$Index.NoteCounts[$d.FullName]
+        })
 
         if ($isExpanded) {
-            $items += Build-NotebookTreeItems -CurrentPath $d.FullName -Level ($Level + 1)
+            Add-TreeItems -Index $Index -Path $d.FullName -Level ($Level + 1) -Items $Items
         }
     }
 
     # 2. Markdown files in this directory (sorted by SortMode: date or alpha)
-    $rawFiles = Get-ChildItem -Path $CurrentPath -File -Filter "*.md" -ErrorAction SilentlyContinue
-    if ($script:SortMode -eq "alpha") {
-        $files = $rawFiles | Sort-Object { Format-NoteTitle $_ }
-    } else {
-        # Default: date (creation date extracted from filename or file creation time, descending)
-        $files = $rawFiles | Sort-Object { 
-            if ($_.BaseName -match '^(\d{4}-\d{2}-\d{2})') { 
-                $matches[1] + " " + $_.CreationTime.ToString("HH:mm:ss")
-            } else { 
-                $_.CreationTime.ToString("yyyy-MM-dd HH:mm:ss") 
-            } 
-        } -Descending
-    }
+    $files = @(Sort-NoteFiles $Index.ChildFiles[$Path])
+
     # Add Spacer if we have both folders and root notes
-    if ($Level -eq 0 -and $subDirs.Count -gt 0 -and $rawFiles.Count -gt 0) {
-        $items += [PSCustomObject]@{
-            Type = "Spacer"
-            Name = ""
-            FullName = ""
-            Level = 0
+    if ($Level -eq 0 -and $subDirs.Count -gt 0 -and $files.Count -gt 0) {
+        $Items.Add([PSCustomObject]@{
+            Type       = "Spacer"
+            Name       = ""
+            FullName   = ""
+            Level      = 0
             IsExpanded = $false
-            ItemCount = 0
-        }
+            ItemCount  = 0
+        })
     }
 
-    foreach ($f in $files) {
-        $noteItem = [PSCustomObject]@{
+    for ($i = 0; $i -lt $files.Count; $i++) {
+        $f = $files[$i]
+        $Items.Add([PSCustomObject]@{
             Type          = "Note"
             Name          = (Format-NoteTitle $f)
             FileName      = $f.Name
             FullName      = $f.FullName
-            FileInfo      = $f
             Level         = $Level
-            IsLastSibling = ($f.FullName -eq $files[-1].FullName)
-        }
-        $items += $noteItem
+            IsLastSibling = ($i -eq $files.Count - 1)
+        })
+    }
+}
+
+function Get-FolderPreviewLines {
+    param($Item, [hashtable]$Index, [int]$UsableWidth)
+
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $telemetryWidth = [Math]::Max(20, $UsableWidth - 2)
+
+    # Reverse gradient: Orange to DarkGray
+    $lines.Add((New-BoxTop " Folder Telemetry " $telemetryWidth))
+
+    $statusStr = if ($Item.IsExpanded) { "Open [v]" } else { "Closed [>]" }
+    $noteCountStr = if ($Item.ItemCount -gt 0) { "$($Item.ItemCount) note(s)" } else { "0 notes (empty)" }
+    $relPath = Get-RelativeNotePath $Item.FullName
+    if ([string]::IsNullOrEmpty($relPath)) { $relPath = "/" }
+
+    $rows = @(
+        @("Folder",   (Truncate-String $Item.Name ($telemetryWidth - 15)),                $cWhite),
+        @("Status",   $statusStr,                                                         $cOrange),
+        @("Contents", $noteCountStr,                                                      $cWhite),
+        @("Path",     (Truncate-String ("~/Notes/" + $relPath) ($telemetryWidth - 15)),   $cGray)
+    )
+    foreach ($row in $rows) {
+        $lbl = $row[0].PadRight(10)
+        $val = $row[1]
+        $pad = " " * [Math]::Max(0, $telemetryWidth - 2 - (" " + $lbl + ": " + $val).Length)
+        $lines.Add(" " + $barLeft + $cGray + " " + $lbl + ": " + $row[2] + $val + $rst + $pad + $barRight)
     }
 
-    return $items
+    $lines.Add((New-BoxBottom $telemetryWidth))
+    $lines.Add("")
+
+    $lines.Add(" " + $cOrange + "Notes Inside:" + $rst)
+    $folderFiles = $Index.ChildFiles[$Item.FullName]
+    if ($folderFiles -and $folderFiles.Count -gt 0) {
+        foreach ($ff in $folderFiles) {
+            $lines.Add("   " + $cWhite + "* " + (Format-NoteTitle $ff) + $rst)
+        }
+    } else {
+        $lines.Add("   " + $cGray + "*(No notes yet in this folder)*" + $rst)
+    }
+
+    $lines.Add("")
+    $lines.Add("  " + $cOrange + "Folder Actions:" + $rst)
+    if ($UsableWidth -lt 55) {
+        $lines.Add("    " + $cOrange + "[W/S] " + $cSilver + "Move  " + $cOrange + "[A/D] " + $cSilver + "Folders" + $rst)
+        $lines.Add("    " + $cOrange + "[R] " + $cSilver + "Rename  " + $cOrange + "[X] " + $cSilver + "Delete" + $rst)
+    } else {
+        $lines.Add("    " + $cOrange + "[W/S] " + $cSilver + "Move  " + $cOrange + "[A/D] " + $cSilver + "Folders  " + $cOrange + "[R] " + $cSilver + "Rename  " + $cOrange + "[X] " + $cSilver + "Delete" + $rst)
+    }
+
+    return $lines.ToArray()
+}
+
+# --- Interactive Prompts ---
+function Select-NotesFolder {
+    # Numbered folder picker. Returns the chosen folder path (defaults to the notebook root).
+    param([string]$Prompt)
+
+    $dirs = @(Get-NoteFolders)
+    if ($dirs.Count -eq 0) { return $NotesDir }
+
+    Write-Host $Prompt -ForegroundColor DarkGray
+    Write-Host "  [1] / (Root ~/Notes)" -ForegroundColor White
+    for ($i = 0; $i -lt $dirs.Count; $i++) {
+        Write-Host ("  [{0}] {1}/" -f ($i + 2), (Get-RelativeNotePath $dirs[$i].FullName)) -ForegroundColor White
+    }
+    Write-Host "Choice (press Enter for 1): " -ForegroundColor White -NoNewline
+    $choice = Read-Host
+    if ($choice -match '^\d+$') {
+        $idx = [int]$choice - 2
+        if ($idx -ge 0 -and $idx -lt $dirs.Count) { return $dirs[$idx].FullName }
+    }
+    return $NotesDir
+}
+
+function Write-InvalidNameMessage {
+    Write-Host "That name has no usable letters or numbers." -ForegroundColor Red
+    Start-Sleep -Milliseconds 800
 }
 
 # --- Folder Creation Prompt ---
 function New-FolderPrompt {
     param([string]$ParentDir = "")
 
+    $script:LastActionPath = $null
     $targetParent = $NotesDir
     $skipPrompt = $false
 
-    if (-not [string]::IsNullOrWhiteSpace($ParentDir) -and (Test-Path $ParentDir)) {
+    if (-not [string]::IsNullOrWhiteSpace($ParentDir) -and (Test-Path -LiteralPath $ParentDir)) {
         $targetParent = $ParentDir
         $skipPrompt = $true
     }
 
-    Clear-Host
-    Write-Host "==================================================" -ForegroundColor DarkGray
-    Write-Host ($cOrange + "                 CREATE NEW FOLDER                " + $rst)
-    Write-Host "==================================================" -ForegroundColor DarkGray
-    $relParent = if ($targetParent -eq $NotesDir) { "/" } else { $targetParent.Substring($NotesDir.Length).TrimStart('\', '/') }
-    Write-Host " Parent: ~/Notes/$relParent" -ForegroundColor Gray
+    Write-ModalHeader "CREATE NEW FOLDER"
+    Write-Host " Parent: ~/Notes/$(Get-RelativeNotePath $targetParent)" -ForegroundColor Gray
     Write-Host " Tip: Press Enter without a name or 'c' to cancel`n" -ForegroundColor DarkGray
 
     if (-not $skipPrompt) {
-        $allDirs = Get-ChildItem -Path $NotesDir -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\\.(obsidian|git)($|\\)' }
-        if ($allDirs -and $allDirs.Count -gt 0) {
-            Write-Host "Where would you like to create this folder?" -ForegroundColor DarkGray
-            Write-Host "  [1] / (Root ~/Notes)" -ForegroundColor White
-            $i = 2
-            foreach ($d in $allDirs) {
-                $rel = $d.FullName.Substring($NotesDir.Length).TrimStart('\', '/')
-                Write-Host ("  [{0}] {1}" -f $i, $rel) -ForegroundColor White
-                $i++
-            }
-            Write-Host "Choice (press Enter for 1): " -ForegroundColor White -NoNewline
-            $pChoice = Read-Host
-            if ($pChoice -match '^\d+$') {
-                $pIdx = [int]$pChoice - 2
-                if ($pIdx -ge 0 -and $pIdx -lt $allDirs.Count) {
-                    $targetParent = $allDirs[$pIdx].FullName
-                }
-            }
-        }
+        $targetParent = Select-NotesFolder "Where would you like to create this folder?"
     }
 
     Write-Host "`nEnter Folder Name: " -ForegroundColor White -NoNewline
     $folderName = Read-Host
 
-    if ([string]::IsNullOrWhiteSpace($folderName) -or $folderName.Trim().ToLower() -in @("c", "cancel", ":q", "exit", "quit")) {
+    if (Test-CancelInput $folderName) {
         Write-Host "Folder creation cancelled." -ForegroundColor DarkYellow
         Start-Sleep -Milliseconds 600
-        return $null
+        return
     }
 
-    $safeName = ($folderName.Trim() -replace '[^\w\s-]', '' -replace '\s+', '-').Trim()
+    $safeName = ConvertTo-Slug $folderName
+    if (-not $safeName) { Write-InvalidNameMessage; return }
     $newFolderPath = Join-Path $targetParent $safeName
 
-    if (Test-Path $newFolderPath) {
+    if (Test-Path -LiteralPath $newFolderPath) {
         Write-Host "Folder already exists: $safeName" -ForegroundColor Red
         Start-Sleep -Milliseconds 800
-        return $null
+        return
     }
 
-    New-Item -ItemType Directory -Path $newFolderPath -Force | Out-Null
-    $script:ExpandedFolders[$newFolderPath] = $true
+    [void][System.IO.Directory]::CreateDirectory($newFolderPath)
+    $script:LastActionPath = $newFolderPath
     Write-Host "`nCreated folder: $safeName" -ForegroundColor Green
     Start-Sleep -Milliseconds 700
-    return $newFolderPath
 }
 
 # --- Rename Prompt (Folder or Note) ---
 function Rename-ItemPrompt {
     param($Item)
-    if (-not $Item -or -not (Test-Path $Item.FullName)) { return }
+    if (-not $Item -or -not (Test-Path -LiteralPath $Item.FullName)) { return }
 
-    Clear-Host
-    Write-Host "==================================================" -ForegroundColor Cyan
-    Write-Host "                    RENAME                        " -ForegroundColor Cyan
-    Write-Host "==================================================" -ForegroundColor Cyan
+    $script:LastActionPath = $null
+    $isFolder = $Item.Type -eq "Folder"
+    $noun = if ($isFolder) { "folder" } else { "note" }
+
+    Write-ModalHeader "RENAME" -Color Cyan
     Write-Host " Current: $($Item.Name)`n" -ForegroundColor Yellow
 
-    if ($Item.Type -eq "Folder") {
-        Write-Host "Enter new folder name (or 'c' to cancel): " -ForegroundColor Yellow -NoNewline
-        $newName = Read-Host
-        if ([string]::IsNullOrWhiteSpace($newName) -or $newName.Trim().ToLower() -in @("c", "cancel", ":q", "exit", "quit")) {
-            Write-Host "Rename cancelled." -ForegroundColor DarkYellow
-            Start-Sleep -Milliseconds 500
-            return
-        }
-
-        $safeName = ($newName.Trim() -replace '[^\w\s-]', '' -replace '\s+', '-').Trim()
-        $parent = Split-Path $Item.FullName -Parent
-        $newPath = Join-Path $parent $safeName
-
-        if (Test-Path $newPath) {
-            Write-Host "A folder with that name already exists." -ForegroundColor Red
-            Start-Sleep -Milliseconds 800
-            return
-        }
-
-        Rename-Item -Path $Item.FullName -NewName $safeName
-        if ($script:ExpandedFolders.ContainsKey($Item.FullName)) {
-            $script:ExpandedFolders.Remove($Item.FullName)
-            $script:ExpandedFolders[$newPath] = $true
-        }
-        Write-Host "`nRenamed folder to: $safeName" -ForegroundColor Green
-        Start-Sleep -Milliseconds 600
-    } else {
-        Write-Host "Enter new note title (or 'c' to cancel): " -ForegroundColor Yellow -NoNewline
-        $newName = Read-Host
-        if ([string]::IsNullOrWhiteSpace($newName) -or $newName.Trim().ToLower() -in @("c", "cancel", ":q", "exit", "quit")) {
-            Write-Host "Rename cancelled." -ForegroundColor DarkYellow
-            Start-Sleep -Milliseconds 500
-            return
-        }
-
-        $safeName = ($newName.Trim() -replace '[^\w\s-]', '' -replace '\s+', '-').ToLower()
-        if (-not $safeName.EndsWith(".md")) { $safeName += ".md" }
-
-        $parent = Split-Path $Item.FullName -Parent
-        $newPath = Join-Path $parent $safeName
-
-        if (Test-Path $newPath) {
-            Write-Host "A note with that name already exists." -ForegroundColor Red
-            Start-Sleep -Milliseconds 800
-            return
-        }
-
-        Rename-Item -Path $Item.FullName -NewName $safeName
-        Write-Host "`nRenamed note to: $safeName" -ForegroundColor Green
-        Start-Sleep -Milliseconds 600
+    $prompt = if ($isFolder) { "Enter new folder name (or 'c' to cancel): " } else { "Enter new note title (or 'c' to cancel): " }
+    Write-Host $prompt -ForegroundColor Yellow -NoNewline
+    $newName = Read-Host
+    if (Test-CancelInput $newName) {
+        Write-Host "Rename cancelled." -ForegroundColor DarkYellow
+        Start-Sleep -Milliseconds 500
+        return
     }
+
+    $safeName = if ($isFolder) { ConvertTo-Slug $newName } else { ConvertTo-Slug $newName -Lower }
+    if (-not $safeName) { Write-InvalidNameMessage; return }
+    if (-not $isFolder) { $safeName += ".md" }
+
+    $newPath = Join-Path (Split-Path $Item.FullName -Parent) $safeName
+    if (Test-Path -LiteralPath $newPath) {
+        Write-Host "A $noun with that name already exists." -ForegroundColor Red
+        Start-Sleep -Milliseconds 800
+        return
+    }
+
+    Rename-Item -LiteralPath $Item.FullName -NewName $safeName
+    if ($isFolder -and $script:CollapsedFolders.ContainsKey($Item.FullName)) {
+        $script:CollapsedFolders.Remove($Item.FullName)
+        $script:CollapsedFolders[$newPath] = $true
+    }
+    $script:LastActionPath = $newPath
+    Write-Host "`nRenamed $noun to: $safeName" -ForegroundColor Green
+    Start-Sleep -Milliseconds 600
 }
 
 # --- Delete Prompt (Folder or Note) ---
 function Delete-ItemPrompt {
     param($Item)
-    if (-not $Item -or -not (Test-Path $Item.FullName)) { return }
+    if (-not $Item -or -not (Test-Path -LiteralPath $Item.FullName)) { return }
 
-    Clear-Host
-    Write-Host "==================================================" -ForegroundColor Red
-    Write-Host "                   DELETE ITEM                    " -ForegroundColor Red
-    Write-Host "==================================================" -ForegroundColor Red
+    Write-ModalHeader "DELETE ITEM" -Color Red
     Write-Host ""
 
     if ($Item.Type -eq "Folder") {
-        $childFiles = Get-ChildItem -Path $Item.FullName -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue
-        if ($childFiles -and $childFiles.Count -gt 0) {
-            Write-Host " [!] WARNING: Folder '$($Item.Name)' contains $($childFiles.Count) note(s)!" -ForegroundColor Yellow -BackgroundColor DarkRed
+        $childCount = @(Get-ChildItem -LiteralPath $Item.FullName -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue).Count
+        if ($childCount -gt 0) {
+            Write-Host " [!] WARNING: Folder '$($Item.Name)' contains $childCount note(s)!" -ForegroundColor Yellow -BackgroundColor DarkRed
             Write-Host "`n Are you SURE you want to delete this folder and ALL its notes? (y/N): " -ForegroundColor Red -NoNewline
         } else {
             Write-Host " [!] DELETE EMPTY FOLDER: '$($Item.Name)'" -ForegroundColor Yellow -BackgroundColor DarkRed
             Write-Host "`n Are you sure you want to delete this empty folder? (y/N): " -ForegroundColor Red -NoNewline
         }
-
-        $confirm = Read-Host
-        if ($confirm.Trim().ToLower() -in @("y", "yes")) {
-            Remove-Item -Path $Item.FullName -Recurse -Force
-            if ($script:ExpandedFolders.ContainsKey($Item.FullName)) {
-                $script:ExpandedFolders.Remove($Item.FullName)
-            }
-            Write-Host "`n Folder deleted: $($Item.Name)" -ForegroundColor Yellow
-            Start-Sleep -Milliseconds 600
-        } else {
-            Write-Host "`n Deletion cancelled." -ForegroundColor DarkGray
-            Start-Sleep -Milliseconds 400
-        }
+        $label = "Folder deleted: $($Item.Name)"
     } else {
         Write-Host " [!] DELETE NOTE: '$($Item.FileName)'" -ForegroundColor Yellow -BackgroundColor DarkRed
         Write-Host "`n Are you sure you want to delete this note? (y/N): " -ForegroundColor Red -NoNewline
-        $confirm = Read-Host
-        if ($confirm.Trim().ToLower() -in @("y", "yes")) {
-            Remove-Item -Path $Item.FullName -Force
-            Write-Host "`n Note deleted: $($Item.FileName)" -ForegroundColor Yellow
-            Start-Sleep -Milliseconds 600
-        } else {
-            Write-Host "`n Deletion cancelled." -ForegroundColor DarkGray
-            Start-Sleep -Milliseconds 400
-        }
+        $label = "Note deleted: $($Item.FileName)"
+    }
+
+    $confirm = Read-Host
+    if ($confirm.Trim().ToLower() -in @("y", "yes")) {
+        Remove-Item -LiteralPath $Item.FullName -Recurse -Force
+        $script:CollapsedFolders.Remove($Item.FullName)
+        Write-Host "`n $label" -ForegroundColor Yellow
+        Start-Sleep -Milliseconds 600
+    } else {
+        Write-Host "`n Deletion cancelled." -ForegroundColor DarkGray
+        Start-Sleep -Milliseconds 400
     }
 }
 
@@ -972,19 +1337,16 @@ function New-InteractiveNote {
         [string]$DestinationDir = ""
     )
 
+    $script:LastActionPath = $null
     $targetDir = $NotesDir
     $skipFolderPrompt = $false
-    if (-not [string]::IsNullOrWhiteSpace($DestinationDir) -and (Test-Path $DestinationDir)) {
+    if (-not [string]::IsNullOrWhiteSpace($DestinationDir) -and (Test-Path -LiteralPath $DestinationDir)) {
         $targetDir = $DestinationDir
         $skipFolderPrompt = $true
     }
 
-    Clear-Host
-    Write-Host "==================================================" -ForegroundColor DarkGray
-    Write-Host ($cOrange + "                CREATE A NEW NOTE                 " + $rst)
-    Write-Host "==================================================" -ForegroundColor DarkGray
-    $relTarget = if ($targetDir -eq $NotesDir) { "/" } else { $targetDir.Substring($NotesDir.Length).TrimStart('\', '/') }
-    Write-Host " Folder: ~/Notes/$relTarget" -ForegroundColor Gray
+    Write-ModalHeader "CREATE A NEW NOTE"
+    Write-Host " Folder: ~/Notes/$(Get-RelativeNotePath $targetDir)" -ForegroundColor Gray
     Write-Host " Tip: Press Enter with an empty title or type 'c' to cancel`n" -ForegroundColor DarkGray
 
     $title = $InitialTitle
@@ -993,64 +1355,47 @@ function New-InteractiveNote {
         $title = Read-Host
     }
 
-    if ([string]::IsNullOrWhiteSpace($title) -or $title.Trim().ToLower() -in @("c", "cancel", ":q", "exit", "quit")) {
+    if (Test-CancelInput $title) {
         Write-Host "Note creation cancelled." -ForegroundColor DarkYellow
         Start-Sleep -Milliseconds 600
-        return $null
+        return
     }
+
+    $title = $title.Trim()
+    $safeTitle = ConvertTo-Slug $title -Lower
+    if (-not $safeTitle) { Write-InvalidNameMessage; return }
 
     # Only ask for destination folder if not already predetermined/contextual
     if (-not $skipFolderPrompt) {
-        $subDirs = Get-ChildItem -Path $NotesDir -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\\.(obsidian|git)($|\\)' }
-        if ($subDirs -and $subDirs.Count -gt 0) {
-            Write-Host "`nWhere would you like to save this note?" -ForegroundColor DarkGray
-            Write-Host "  [1] / (Root ~/Notes)" -ForegroundColor White
-            $di = 2
-            foreach ($sd in $subDirs) {
-                $rel = $sd.FullName.Substring($NotesDir.Length).TrimStart('\', '/')
-                Write-Host ("  [{0}] {1}/" -f $di, $rel) -ForegroundColor White
-                $di++
-            }
-            Write-Host "Choice (press Enter for 1): " -ForegroundColor White -NoNewline
-            $dirChoice = Read-Host
-            if ($dirChoice -match '^\d+$') {
-                $idx = [int]$dirChoice - 2
-                if ($idx -ge 0 -and $idx -lt $subDirs.Count) {
-                    $targetDir = $subDirs[$idx].FullName
-                }
-            }
-        }
+        $targetDir = Select-NotesFolder "`nWhere would you like to save this note?"
     }
 
-    $safeTitle = ($title.Trim() -replace '[^\w\s-]', '' -replace '\s+', '-').ToLower()
     $datePrefix = (Get-Date).ToString("yyyy-MM-dd")
     $fileName = "$datePrefix-$safeTitle.md"
     $filePath = Join-Path $targetDir $fileName
 
     $count = 1
-    while (Test-Path $filePath) {
+    while (Test-Path -LiteralPath $filePath) {
         $fileName = "$datePrefix-$safeTitle-$count.md"
         $filePath = Join-Path $targetDir $fileName
         $count++
     }
 
-    $ed = Get-PreferredTerminalEditor
-
     $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm")
-    $initialContent = "---`r`ntitle: `"$title`"`r`ndate: $timestamp`r`ntags:`r`n  - note`r`n---`r`n`r`n# $title`r`n`r`n"
+    $yamlTitle = $title.Replace('\', '\\').Replace('"', '\"')
+    $initialContent = "---`r`ntitle: `"$yamlTitle`"`r`ndate: $timestamp`r`ntags:`r`n  - note`r`n---`r`n`r`n# $title`r`n`r`n"
+    Write-Utf8File -Path $filePath -Text ($initialContent + [Environment]::NewLine)
+    $script:LastActionPath = $filePath
 
-    Set-Content -Path $filePath -Value $initialContent -Encoding UTF8
-
+    $ed = Get-PreferredTerminalEditor
     if ($ed) {
         Invoke-TerminalEditor -EditorPath $ed -FilePath $filePath -GoToEnd
         Write-Host "Saved note: $fileName" -ForegroundColor Green
     } else {
-        Open-InObsidian -File (Get-Item $filePath)
+        Open-InObsidian -File (Get-Item -LiteralPath $filePath)
         Write-Host "Created note in Obsidian: $fileName" -ForegroundColor Green
     }
     Start-Sleep -Milliseconds 700
-
-    return $filePath
 }
 
 function Quick-Log {
@@ -1060,7 +1405,7 @@ function Quick-Log {
         Write-Host "`nEnter quick thought (or press Enter to cancel): " -ForegroundColor Yellow -NoNewline
         $Text = Read-Host
     }
-    if ([string]::IsNullOrWhiteSpace($Text) -or $Text.Trim().ToLower() -in @("c", "cancel", ":q", "exit", "quit")) {
+    if (Test-CancelInput $Text) {
         Write-Host "Cancelled." -ForegroundColor DarkYellow
         Start-Sleep -Milliseconds 500
         return
@@ -1069,53 +1414,40 @@ function Quick-Log {
     $today = (Get-Date).ToString("yyyy-MM-dd")
     $fileName = "$today-quick-log.md"
     $filePath = Join-Path $NotesDir $fileName
+    $nl = [Environment]::NewLine
 
-    $time = (Get-Date).ToString("HH:mm")
-    if (-not (Test-Path $filePath)) {
-        $header = "# Daily Quick Log ($today)`r`n`r`n"
-        Set-Content -Path $filePath -Value $header -Encoding UTF8
+    if (-not (Test-Path -LiteralPath $filePath)) {
+        Write-Utf8File -Path $filePath -Text ("# Daily Quick Log ($today)`r`n`r`n" + $nl)
     }
 
-    $entry = "- **[$time]** $Text"
-    Add-Content -Path $filePath -Value $entry -Encoding UTF8
+    $time = (Get-Date).ToString("HH:mm")
+    Write-Utf8File -Path $filePath -Text ("- **[$time]** $Text" + $nl) -Append
     Write-Host "Added to: $fileName" -ForegroundColor Green
     Start-Sleep -Milliseconds 800
 }
 
 function Append-ToNote {
     param([System.IO.FileInfo]$File)
-    if (-not $File -or -not (Test-Path $File.FullName)) { return }
+    if (-not $File -or -not (Test-Path -LiteralPath $File.FullName)) { return }
 
-    Clear-Host
-    Write-Host "==================================================" -ForegroundColor Cyan
-    Write-Host "             APPEND TO: $($File.Name)             " -ForegroundColor Cyan
-    Write-Host "==================================================" -ForegroundColor Cyan
+    Write-ModalHeader "APPEND TO: $($File.Name)" -Color Cyan
     Write-Host " Type your new lines below." -ForegroundColor DarkCyan
     Write-Host " (Press Enter on an empty line to finish, or ':cancel' to abort)`n" -ForegroundColor DarkGray
 
-    $lines = @()
-    $wasCancelled = $false
+    $lines = [System.Collections.Generic.List[string]]::new()
     while ($true) {
         $line = Read-Host
         if ($line.Trim().ToLower() -in @(":c", ":cancel", ":q", ":abort")) {
-            $wasCancelled = $true
-            break
+            Write-Host "`nCancelled. Note unchanged." -ForegroundColor DarkYellow
+            Start-Sleep -Milliseconds 600
+            return
         }
-        if ([string]::IsNullOrEmpty($line)) {
-            break
-        }
-        $lines += $line
-    }
-
-    if ($wasCancelled) {
-        Write-Host "`nCancelled. Note unchanged." -ForegroundColor DarkYellow
-        Start-Sleep -Milliseconds 600
-        return
+        if ([string]::IsNullOrEmpty($line)) { break }
+        $lines.Add($line)
     }
 
     if ($lines.Count -gt 0) {
-        $toAppend = "`r`n" + ($lines -join "`r`n")
-        Add-Content -Path $File.FullName -Value $toAppend -Encoding UTF8
+        Write-Utf8File -Path $File.FullName -Text ("`r`n" + ($lines -join "`r`n") + [Environment]::NewLine) -Append
         Write-Host "`nAdded $($lines.Count) line(s) to $($File.Name)" -ForegroundColor Green
         Start-Sleep -Milliseconds 700
     }
@@ -1123,10 +1455,9 @@ function Append-ToNote {
 
 function Edit-NoteFile {
     param([System.IO.FileInfo]$File)
-    if (-not $File -or -not (Test-Path $File.FullName)) { return }
+    if (-not $File -or -not (Test-Path -LiteralPath $File.FullName)) { return }
 
     $terminalEditor = Get-PreferredTerminalEditor
-
     if ($terminalEditor) {
         Invoke-TerminalEditor -EditorPath $terminalEditor -FilePath $File.FullName -GoToEnd
     } else {
@@ -1139,123 +1470,107 @@ function View-FullscreenNote {
         [System.IO.FileInfo]$File,
         [switch]$ReadOnly
     )
-    if (-not $File -or -not (Test-Path $File.FullName)) { return }
+    if (-not $File -or -not (Test-Path -LiteralPath $File.FullName)) { return }
 
-    $termWidth = 100
-    try {
-        if ([Console]::WindowWidth -gt 50) { $termWidth = [Console]::WindowWidth }
-    } catch {}
-
-    $termW = [Math]::Max(20, $termWidth - 2)
-    $borderLine = "=" * [Math]::Min(120, $termW)
-    $divLine    = "-" * [Math]::Min(120, $termW)
-
-    $lines = Get-Content -Path $File.FullName
-    $textWidth = [Math]::Max(30, $termW - 2)
-    $renderedLines = @(Convert-MarkdownToTerminalLines -RawLines $lines -Width $textWidth)
-
+    $rawLines = @(Get-Content -LiteralPath $File.FullName -Encoding UTF8)
+    $renderWidth = -1
     $scrollOffset = 0
+    $needsClear = $true
+
+    $footerKeys = $cOrange + "[Up/Dn/PgUp/PgDn]" + $cSilver + " Scroll  "
+    if (-not $ReadOnly) {
+        $footerKeys += $cOrange + "[E]" + $cSilver + " Edit  " +
+                       $cOrange + "[O]" + $cSilver + " Obsidian  " +
+                       $cOrange + "[P]" + $cSilver + " Append  "
+    }
+    $footerKeys += $cOrange + "[Q/Esc]" + $cSilver + " Return..."
+    $modeTag = if ($ReadOnly) { $cGray + " [Read-Only]" } else { "" }
 
     while ($true) {
+        $termWidth = 100
         $termHeight = 26
         try {
+            if ([Console]::WindowWidth -gt 50) { $termWidth = [Console]::WindowWidth }
             if ([Console]::WindowHeight -gt 15) { $termHeight = [Console]::WindowHeight }
         } catch {}
-        
+
+        # Re-wrap the document whenever the terminal width changes
+        if ($termWidth -ne $renderWidth) {
+            $termW = [Math]::Max(20, $termWidth - 2)
+            $borderLine = $cDarkGray + ("=" * [Math]::Min(120, $termW)) + $rst
+            $textWidth = [Math]::Max(30, $termW - 2)
+            $renderedLines = @(Convert-MarkdownToTerminalLines -RawLines $rawLines -Width $textWidth)
+            $renderWidth = $termWidth
+            $needsClear = $true
+        }
+
         $viewHeight = [Math]::Max(5, $termHeight - 13)
         $maxScroll = [Math]::Max(0, $renderedLines.Count - $viewHeight)
         if ($scrollOffset -gt $maxScroll) { $scrollOffset = $maxScroll }
-
-        Clear-Host
-        Write-Host (Render-HeaderBanner $termWidth)
-        Write-Host ""
-        Write-Host $borderLine -ForegroundColor DarkGray
-        $modeTag = if ($ReadOnly) { $cGray + " [Read-Only]" } else { "" }
-        Write-Host ($cOrange + " Fullscreen Reader: " + $rst + $cWhite + $File.Name + $modeTag + $rst)
-        Write-Host (" Path: " + $cGray + $File.FullName + $rst)
-        Write-Host $borderLine -ForegroundColor DarkGray
-        Write-Host ""
-
         $visEnd = [Math]::Min($renderedLines.Count, $scrollOffset + $viewHeight)
-        for ($i = $scrollOffset; $i -lt $visEnd; $i++) {
-            [Console]::WriteLine($renderedLines[$i])
+
+        # Assemble the whole frame in memory, then write it in one go (no flicker)
+        $sb = [System.Text.StringBuilder]::new()
+        [void]$sb.Append((Render-HeaderBanner $termWidth)).Append("`r`n`r`n")
+        [void]$sb.Append($borderLine + "`r`n")
+        [void]$sb.Append($cOrange + " Fullscreen Reader: " + $rst + $cWhite + (Truncate-String $File.Name ($termWidth - 35)) + $modeTag + $rst + "`r`n")
+        [void]$sb.Append(" Path: " + $cGray + (Truncate-String $File.FullName ($termWidth - 8)) + $rst + "`r`n")
+        [void]$sb.Append($borderLine + "`r`n`r`n")
+
+        for ($i = 0; $i -lt $viewHeight; $i++) {
+            $idx = $scrollOffset + $i
+            if ($idx -lt $visEnd) { [void]$sb.Append((Limit-AnsiText $renderedLines[$idx] ($termWidth - 1)) + $rst) }
+            [void]$sb.Append("`r`n")
         }
 
-        for ($i = $visEnd - $scrollOffset; $i -lt $viewHeight; $i++) {
-            [Console]::WriteLine("")
-        }
-
-        Write-Host "`n$borderLine" -ForegroundColor DarkGray
-        
-        $footer = " "
+        [void]$sb.Append("`r`n" + $borderLine + "`r`n")
         $scrollNotice = if ($renderedLines.Count -gt $viewHeight) { $cGray + "  [$($scrollOffset + 1)-$visEnd of $($renderedLines.Count)] " } else { "" }
+        [void]$sb.Append(" " + $footerKeys + $scrollNotice + $rst + "$esc[J")
 
-        if ($ReadOnly) {
-            $footer += $cOrange + "[Up/Dn/PgUp/PgDn]" + $cSilver + " Scroll  " + 
-                       $cOrange + "[Q/Esc]" + $cSilver + " Return..." + $scrollNotice
-            [Console]::Write($footer + $rst)
-            try {
-                $k = [Console]::ReadKey($true)
-                $key = $k.Key
-                if ($key -in @("UpArrow", "W", "K")) { $scrollOffset = [Math]::Max(0, $scrollOffset - 1) }
-                elseif ($key -in @("DownArrow", "S", "J")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + 1) }
-                elseif ($key -eq "PageUp") { $scrollOffset = [Math]::Max(0, $scrollOffset - $viewHeight) }
-                elseif ($key -in @("PageDown", "Spacebar")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + $viewHeight) }
-                elseif ($key -in @("Escape", "Q", "Enter", "Backspace")) { break }
-            } catch { break }
+        if ($needsClear) {
+            Clear-Host
+            $needsClear = $false
         } else {
-            $footer += $cOrange + "[Up/Dn/PgUp/PgDn]" + $cSilver + " Scroll  " + 
-                       $cOrange + "[E]" + $cSilver + " Edit  " + 
-                       $cOrange + "[O]" + $cSilver + " Obsidian  " + 
-                       $cOrange + "[P]" + $cSilver + " Append  " + 
-                       $cOrange + "[Q/Esc]" + $cSilver + " Return..." + $scrollNotice
-            [Console]::Write($footer + $rst)
-            try {
-                $k = [Console]::ReadKey($true)
-                $key = $k.Key
-                if ($key -in @("UpArrow", "W", "K")) { $scrollOffset = [Math]::Max(0, $scrollOffset - 1) }
-                elseif ($key -in @("DownArrow", "S", "J")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + 1) }
-                elseif ($key -eq "PageUp") { $scrollOffset = [Math]::Max(0, $scrollOffset - $viewHeight) }
-                elseif ($key -in @("PageDown", "Spacebar")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + $viewHeight) }
-                elseif ($key -in @("Escape", "Q", "Enter", "Backspace")) { break }
-                elseif ($key -eq "E") {
-                    Edit-NoteFile -File $File
-                    break
-                } elseif ($key -eq "O") {
-                    Open-InObsidian -File $File
-                    break
-                } elseif ($key -in @("A", "P")) {
-                    Append-ToNote -File $File
-                    break
-                }
-            } catch { break }
+            try { [Console]::SetCursorPosition(0, 0) } catch {}
+            [Console]::Write("$esc[H")
+        }
+        # Clear each line's tail so shorter lines don't leave remnants of the previous frame
+        [Console]::Write($sb.ToString().Replace("`r`n", "$esc[K`r`n"))
+
+        try { $k = Read-KeyOrResize } catch { break }
+        if ($null -eq $k) { $needsClear = $true; continue }
+
+        $key = $k.Key
+        if ($key -in @("UpArrow", "W", "K")) { $scrollOffset = [Math]::Max(0, $scrollOffset - 1) }
+        elseif ($key -in @("DownArrow", "S", "J")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + 1) }
+        elseif ($key -eq "PageUp") { $scrollOffset = [Math]::Max(0, $scrollOffset - $viewHeight) }
+        elseif ($key -in @("PageDown", "Spacebar")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + $viewHeight) }
+        elseif ($key -in @("Escape", "Q", "Enter", "Backspace")) { break }
+        elseif (-not $ReadOnly) {
+            if ($key -eq "E") { Edit-NoteFile -File $File; break }
+            elseif ($key -eq "O") { Open-InObsidian -File $File; break }
+            elseif ($key -in @("A", "P")) { Append-ToNote -File $File; break }
         }
     }
 }
 
 function Search-NotesPrompt {
-    Clear-Host
-    Write-Host "==================================================" -ForegroundColor DarkGray
-    Write-Host ($cOrange + "                SEARCH IN NOTES                   " + $rst)
-    Write-Host "==================================================" -ForegroundColor DarkGray
+    Write-ModalHeader "SEARCH IN NOTES"
     Write-Host ""
     Write-Host "Enter search query: " -ForegroundColor White -NoNewline
-    $Query = Read-Host
-    if ([string]::IsNullOrWhiteSpace($Query)) { return }
+    $query = Read-Host
+    if ([string]::IsNullOrWhiteSpace($query)) { return }
 
-    $allNotes = Get-AllNotes
-    $matches = $allNotes | Select-String -Pattern $Query
+    # -SimpleMatch: treat the query as plain text so characters like ( [ * don't throw regex errors
+    $hits = @(Get-AllNotes | Select-String -Pattern $query -SimpleMatch -Encoding UTF8)
 
-    if (-not $matches) {
-        Write-Host "`nNo notes found matching '$Query'." -ForegroundColor DarkGray
+    if ($hits.Count -eq 0) {
+        Write-Host "`nNo notes found matching '$query'." -ForegroundColor DarkGray
     } else {
-        Write-Host "`nMatches found for '$Query':" -ForegroundColor White
+        Write-Host "`nMatches found for '$query':" -ForegroundColor White
         Write-Host "--------------------------------------------------" -ForegroundColor DarkGray
-        $grouped = $matches | Group-Object -Property Path
-        foreach ($g in $grouped) {
-            $f = Get-Item $g.Name
-            $rel = $f.FullName.Substring($NotesDir.Length).TrimStart('\', '/')
-            Write-Host ("`n" + $cOrange + "* " + $rel + $rst)
+        foreach ($g in ($hits | Group-Object -Property Path)) {
+            Write-Host ("`n" + $cOrange + "* " + (Get-RelativeNotePath $g.Name) + $rst)
             foreach ($m in $g.Group) {
                 Write-Host ("   Line {0}: {1}" -f $m.LineNumber, $m.Line.Trim()) -ForegroundColor White
             }
@@ -1265,620 +1580,497 @@ function Search-NotesPrompt {
     Read-Host | Out-Null
 }
 
-function Start-NotebookBrowser {
-    $selectedIndex = 0
-    $pendingSelectPath = $null
-    $script:needsFullClear = $true
+# --- Notebook Browser ---
 
-    function Invoke-Modal([scriptblock]$action) {
-        try { [Console]::CursorVisible = $true } catch {}
-        [Console]::Write("$esc[?25h")
-        & $action
-        $script:needsFullClear = $true
-        try { [Console]::CursorVisible = $false } catch {}
-        [Console]::Write("$esc[?25l")
+# Every hotkey shown in the nav bar. "When" limits an entry to Note/Folder selections or scrollable previews.
+$NavSpec = @(
+    @{ Key = "[W/S]";   Label = " Move " },
+    @{ Key = "[A/D]";   Label = " Folders " },
+    @{ Key = "[J/K]";   Label = " Scroll ";     When = "Scroll" },
+    @{ Key = "[T]";     Label = " Sort " },
+    @{ Key = "[Enter]"; Label = " Expand ";     When = "Folder" },
+    @{ Key = "[Enter]"; Label = " View ";       When = "Note" },
+    @{ Key = "[V]";     Label = " Fullscreen "; When = "Note" },
+    @{ Key = "[E]";     Label = " Edit ";       When = "Note" },
+    @{ Key = "[O]";     Label = " Obsidian ";   When = "Note" },
+    @{ Key = "[N]";     Label = " Note " },
+    @{ Key = "[F]";     Label = " Folder " },
+    @{ Key = "[U]";     Label = " Updates " },
+    @{ Key = "[R]";     Label = " Rename " },
+    @{ Key = "[X]";     Label = " Del " },
+    @{ Key = "[Q]";     Label = " Exit" }
+)
+
+function Format-NavBar($Items, [int]$Width) {
+    $sb = [System.Text.StringBuilder]::new(" ")
+    $curLen = 1
+    $lines = 1
+    foreach ($item in $Items) {
+        $itemLen = $item.Key.Length + $item.Label.Length + 1
+        if ($curLen + $itemLen -ge $Width) {
+            [void]$sb.Append("`r`n ")
+            $curLen = 1
+            $lines++
+        }
+        [void]$sb.Append($cOrange + $item.Key + $cSilver + $item.Label + " ")
+        $curLen += $itemLen
+    }
+    return @{ Text = $sb.ToString(); Lines = $lines }
+}
+
+function Get-ContextFolder($Item) {
+    # The folder new items should go into, based on the current selection
+    if ($Item -and $Item.Type -eq "Folder") { return $Item.FullName }
+    if ($Item -and $Item.Type -eq "Note") { return (Split-Path -Parent $Item.FullName) }
+    return $NotesDir
+}
+
+function Start-NotebookBrowser {
+    # Mutable UI state shared with the nested Invoke-Modal helper
+    $ui = @{
+        NeedsFullClear    = $true
+        IndexDirty        = $true
+        PendingSelectPath = $null
     }
 
+    function Invoke-Modal([scriptblock]$Action) {
+        Set-CursorVisible $true
+        $script:LastActionPath = $null
+        & $Action
+        if ($script:LastActionPath) { $ui.PendingSelectPath = $script:LastActionPath }
+        $ui.NeedsFullClear = $true
+        $ui.IndexDirty = $true
+        Set-CursorVisible $false
+    }
+
+    function Get-ActiveNoteFile {
+        if ($activeItem -and $activeItem.Type -eq "Note" -and [System.IO.File]::Exists($activeItem.FullName)) {
+            return (Get-Item -LiteralPath $activeItem.FullName)
+        }
+        return $null
+    }
+
+    $selectedIndex = 0
+    $treeItems = @()
+    $itemsDirty = $true
+    $index = $null
+    $indexStamp = [DateTime]::MinValue
+    $indexVersion = 0
+    $previewKey = $null
+    $previewLines = @()
     $previewScrollOffset = 0
     $lastSelectedIndex = -1
-    $script:lastBoxHeight = 0
-    $script:lastTermWidth = 0
+    $lastBoxHeight = 0
+    $lastTermWidth = 0
+    $navWidth = -1
+    $worstNavLines = 1
+    $vBar = $cDarkGray + $bVert + $rst
 
+    Set-CursorVisible $false
     try {
         while ($true) {
-            # Build visible hierarchical tree items
-            $treeItems = Build-NotebookTreeItems -CurrentPath $NotesDir -Level 0
-
-        if (-not $treeItems) { $treeItems = @() }
-
-        if ($pendingSelectPath) {
-            for ($ti = 0; $ti -lt $treeItems.Count; $ti++) {
-                if ($treeItems[$ti].FullName -eq $pendingSelectPath) {
-                    $selectedIndex = $ti
-                    break
-                }
-            }
-            $pendingSelectPath = $null
-        }
-
-        if ($selectedIndex -ge $treeItems.Count) {
-            $selectedIndex = [Math]::Max(0, $treeItems.Count - 1)
-        }
-
-        # Terminal dimensions
-        $termWidth = 100
-        $termHeight = 26
-        try {
-            if ([Console]::WindowWidth -gt 20) { $termWidth = [Console]::WindowWidth }
-            if ([Console]::WindowHeight -gt 10) { $termHeight = [Console]::WindowHeight }
-        } catch {}
-
-        # Geometry calculations (Total box width = termWidth = 1 + leftWidth + 1 + rightWidth + 1)
-        $leftWidth = [Math]::Max(15, [Math]::Min(38, [Math]::Floor($termWidth * 0.35)))
-        $rightWidth = $termWidth - $leftWidth - 3
-        
-        if ($rightWidth -lt 25) {
-            $rightWidth = 25
-            $leftWidth = $termWidth - $rightWidth - 3
-            if ($leftWidth -lt 5) { $leftWidth = 5 }
-        }
-        
-        $usableWidth = [Math]::Max(20, $rightWidth - 3)
-
-        # Active item preview content
-        $previewLines = @()
-        $currentRightTitle = "No selection"
-        $activeItem = if ($treeItems.Count -gt 0 -and $selectedIndex -lt $treeItems.Count) { $treeItems[$selectedIndex] } else { $null }
-
-        if ($activeItem) {
-            if ($activeItem.Type -eq "Folder") {
-                $currentRightTitle = "Folder: " + $activeItem.Name
-
-                $telemetryWidth = [Math]::Max(20, $usableWidth - 2)
-
-                $boxTitle = " FOLDER TELEMETRY "
-                $dashesLeft = 1
-                $dashesRight = [Math]::Max(2, $telemetryWidth - $boxTitle.Length - $dashesLeft - 2)
-                # Reverse gradient: Orange to DarkGray
-                $topBorderStr = $uRoundTL + ($uHoriz * $dashesLeft) + $boxTitle + ($uHoriz * $dashesRight) + $uRoundTR
-                $coloredTop = " " + (Render-GradientText $topBorderStr $gWaveOrange $gWaveDark)
-                $previewLines += $coloredTop
-
-                $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
-                $rightBar = Render-GradientText $uVert $gWaveDark $gWaveOrange
-
-                $statusStr = if ($activeItem.IsExpanded) { "Open [v]" } else { "Closed [>]" }
-                $shortName = Truncate-String -Str $activeItem.Name -MaxLen ($telemetryWidth - 15)
-                $noteCountStr = if ($activeItem.ItemCount -gt 0) { "$($activeItem.ItemCount) note(s)" } else { "0 notes (empty)" }
-                $relPath = $activeItem.FullName.Substring($NotesDir.Length).TrimStart('\', '/')
-                if ([string]::IsNullOrEmpty($relPath)) { $relPath = "/" }
-                $shortRelPath = Truncate-String -Str ("~/Notes/" + $relPath) -MaxLen ($telemetryWidth - 15)
-
-                $cCardLabel  = fg 155 160 175
-
-                function Get-TLine($lbl, $val, $valCol) {
-                    $content = " " + $lbl.PadRight(10) + ": " + $val
-                    $padLen = [Math]::Max(0, $telemetryWidth - 2 - $content.Length)
-                    $pad = " " * $padLen
-                    return " " + $leftBar + $cCardLabel + " " + $lbl.PadRight(10) + ": " + $valCol + $val + $rst + $pad + $rightBar
-                }
-
-                $previewLines += Get-TLine "Folder" $shortName $cWhite
-                $previewLines += Get-TLine "Status" $statusStr $cOrange
-                $previewLines += Get-TLine "Contents" $noteCountStr $cWhite
-                $previewLines += Get-TLine "Path" $shortRelPath $cGray
-
-                $botBorderStr = $uRoundBL + ($uHoriz * ($telemetryWidth - 2)) + $uRoundBR
-                $coloredBot = " " + (Render-GradientText $botBorderStr $gWaveOrange $gWaveDark)
-                $previewLines += $coloredBot
-                $previewLines += ""
-
-                $folderFiles = Get-ChildItem -Path $activeItem.FullName -File -Filter "*.md" -ErrorAction SilentlyContinue
-                $previewLines += (" " + $cOrange + "Notes Inside:" + $rst)
-                if ($folderFiles -and $folderFiles.Count -gt 0) {
-                    foreach ($ff in $folderFiles) {
-                        $cleanTitle = Format-NoteTitle $ff
-                        $previewLines += ("   " + $cWhite + "* " + $cleanTitle + $rst)
-                    }
-                } else {
-                    $previewLines += ("   " + $cGray + "*(No notes yet in this folder)*" + $rst)
-                }
-                $previewLines += ""
-                $previewLines += ("  " + $cOrange + "Folder Actions:" + $rst)
-                if ($usableWidth -lt 55) {
-                    $previewLines += ("    " + $cOrange + "[W/S] " + $cSilver + "Move  " + $cOrange + "[A/D] " + $cSilver + "Folders" + $rst)
-                    $previewLines += ("    " + $cOrange + "[R] " + $cSilver + "Rename  " + $cOrange + "[X] " + $cSilver + "Delete" + $rst)
-                } else {
-                    $previewLines += ("    " + $cOrange + "[W/S] " + $cSilver + "Move  " + $cOrange + "[A/D] " + $cSilver + "Folders  " + $cOrange + "[R] " + $cSilver + "Rename  " + $cOrange + "[X] " + $cSilver + "Delete" + $rst)
-                }
-            } elseif ($activeItem.Type -eq "Note") {
-                # Note
-                $currentRightTitle = $activeItem.FileName
-                if (Test-Path $activeItem.FullName) {
-                    $rawLines = Get-Content -Path $activeItem.FullName -TotalCount 500
-                    $previewLines = @(Convert-MarkdownToTerminalLines -RawLines $rawLines -Width $usableWidth)
-                }
-            }
-        }
-
-        # --- PRE-COMPUTE NAVBAR TO DETERMINE EXACT HEIGHT ---
-        $needsScrollBadge = ($previewLines.Count -gt ([Math]::Max(5, $termHeight - 10)))
-        
-        $navItems = @(
-            @("[W/S]", " Move "), @("[A/D]", " Folders ")
-        )
-        if ($needsScrollBadge) { $navItems += ,@("[J/K]", " Scroll ") }
-        $navItems += ,@("[T]", " Sort ")
-
-        if ($activeItem -and $activeItem.Type -eq "Note") {
-            $navItems += @(
-                @("[Enter]", " View "),
-                @("[V]", " Fullscreen "),
-                @("[E]", " Edit "),
-                @("[O]", " Obsidian ")
-            )
-        } elseif ($activeItem -and $activeItem.Type -eq "Folder") {
-            $navItems += ,@("[Enter]", " Expand ")
-        }
-
-        $navItems += @(
-            @("[N]", " Note "), @("[F]", " Folder "),
-            @("[U]", " Updates "), @("[R]", " Rename "),
-            @("[X]", " Del "), @("[Q]", " Exit")
-        )
-
-        # Calculate worst-case nav lines to prevent UI bouncing/flickering
-        $worstItems = @(
-            @("[W/S]", " Move "), @("[A/D]", " Folders "), @("[J/K]", " Scroll "), @("[T]", " Sort "),
-            @("[Enter]", " Expand "), @("[Enter]", " View "), @("[V]", " Fullscreen "), @("[E]", " Edit "), @("[O]", " Obsidian "),
-            @("[N]", " Note "), @("[F]", " Folder "), @("[U]", " Updates "),
-            @("[R]", " Rename "), @("[X]", " Del "), @("[Q]", " Exit")
-        )
-        $worstLen = 1
-        $worstLines = 1
-        foreach ($item in $worstItems) {
-            $itemLen = $item[0].Length + $item[1].Length + 1
-            if ($worstLen + $itemLen -ge $termWidth) {
-                $worstLen = 1
-                $worstLines++
-            }
-            $worstLen += $itemLen
-        }
-
-        $navBar = " "
-        $curLen = 1
-        $actualLines = 1
-        foreach ($item in $navItems) {
-            $hotkey = $item[0]
-            $label = $item[1]
-            $itemLen = $hotkey.Length + $label.Length + 1
-            if ($curLen + $itemLen -ge $termWidth) {
-                $navBar += "`r`n "
-                $curLen = 1
-                $actualLines++
-            }
-            $navBar += $cOrange + $hotkey + $cSilver + $label + " "
-            $curLen += $itemLen
-        }
-        $navBar += $rst + "$esc[J"
-
-        # Pad with newlines so the navBar always occupies $worstLines height
-        if ($actualLines -lt $worstLines) {
-            $navBar += ("`r`n" * ($worstLines - $actualLines))
-        }
-
-        # Fixed full-terminal layout: dynamic box height based on actual navBar lines AND the 4-line top banner
-        $boxHeight = [Math]::Max(1, $termHeight - 9 - $worstLines)
-
-        if ($boxHeight -ne $script:lastBoxHeight -or $termWidth -ne $script:lastTermWidth) {
-            $script:needsFullClear = $true
-            $script:lastBoxHeight = $boxHeight
-            $script:lastTermWidth = $termWidth
-        }
-
-        # Reset preview scroll when selecting a new item
-        if ($selectedIndex -ne $lastSelectedIndex) {
-            $previewScrollOffset = 0
-            $lastSelectedIndex = $selectedIndex
-        }
-
-        $maxPreviewScroll = [Math]::Max(0, $previewLines.Count - $boxHeight)
-        if ($previewScrollOffset -gt $maxPreviewScroll) {
-            $previewScrollOffset = $maxPreviewScroll
-        }
-
-        # Scrolling window for items list
-        $scrollOffset = 0
-        if ($selectedIndex -ge $boxHeight) {
-            $scrollOffset = $selectedIndex - $boxHeight + 1
-        }
-
-        # Assemble Frame in Memory (Flicker-Free Double-Buffering)
-        $sb = New-Object System.Text.StringBuilder
-
-        # 1. Header Banner (Graphite to Flame Orange Horizon)
-        [void]$sb.AppendLine((Render-HeaderBanner $termWidth))
-
-        # 2. Box Header (100% Aligned Math)
-        $sortTag = if ($script:SortMode -eq "alpha") { "A-Z" } else { "Date" }
-        $leftTitle = " Notes ($sortTag) "
-        $leftDashes = $leftWidth - $leftTitle.Length - 1
-        if ($leftDashes -lt 0) {
-            $leftTitle = Truncate-String -Str $leftTitle -MaxLen ($leftWidth - 1)
-            $leftDashes = 0
-        }
-
-        $scrollNotice = ""
-        if ($previewLines.Count -gt $boxHeight) {
-            $visEnd = [Math]::Min($previewLines.Count, $previewScrollOffset + $boxHeight)
-            $scrollNotice = " [$($previewScrollOffset + 1)-$visEnd of $($previewLines.Count)] "
-        }
-
-        $maxRightTitleLen = [Math]::Max(10, $rightWidth - 14 - $scrollNotice.Length)
-        $cleanRightTitle = Truncate-String -Str $currentRightTitle -MaxLen $maxRightTitleLen
-        $rightTitle = " Preview: " + $cleanRightTitle + $scrollNotice + " "
-        $rightDashes = $rightWidth - $rightTitle.Length - 1
-        if ($rightDashes -lt 0) {
-            $rightTitle = Truncate-String -Str $rightTitle -MaxLen ($rightWidth - 1)
-            $rightDashes = 0
-        }
-
-        [void]$sb.Append($cDarkGray + $bTopLeft + $bHoriz + $cOrange + $leftTitle + $cDarkGray + ($bHoriz * $leftDashes) + $bTopT + $bHoriz + $cWhite + $rightTitle + $cDarkGray + ($bHoriz * $rightDashes) + $bTopRight + $rst + "`r`n")
-
-        # 3. Render Rows
-        for ($r = 0; $r -lt $boxHeight; $r++) {
-            $itemIdx = $scrollOffset + $r
-            $isRowSelected = ($itemIdx -eq $selectedIndex) -and ($treeItems.Count -gt 0)
-
-            # Left column formatting
-            $leftStr = ""
-            $isFolderRow = $false
-            if ($itemIdx -lt $treeItems.Count) {
-                $cur = $treeItems[$itemIdx]
-                if ($cur.Type -eq "Spacer") {
-                    $leftStr = ""
-                    $isRowSelected = $false # Spacers cannot be selected
-                } elseif ($cur.Type -eq "Folder") {
-                    $isFolderRow = $true
-                    $indent = "  " * $cur.Level
-                    $arrow = if ($cur.IsExpanded) { "$gArrowDown " } else { "$gArrowRight " }
-                    $icon = if ($cur.IsExpanded) { "$gFolderOpen " } else { "$gFolderClosed " }
-                    $countLabel = " ($($cur.ItemCount))"
-                    $maxNameLen = $leftWidth - $indent.Length - 7 - $countLabel.Length
-                    $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
-                    $leftStr = "$indent$arrow$icon$dispName$countLabel"
-                } else {
-                    $indent = "  " * $cur.Level
-                    $branch = if ($cur.Level -gt 0) {
-                        if ($cur.IsLastSibling) { ([string][char]0x2514 + [string][char]0x2500 + " ") }
-                        else { ([string][char]0x251C + [string][char]0x2500 + " ") }
-                    } else {
-                        "  "
-                    }
-                    $icon = "$branch$gFileIcon "
-                    $maxNameLen = $leftWidth - $indent.Length - 6
-                    $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
-                    $leftStr = "$indent$icon$dispName"
-                }
-                $leftStr = $leftStr.PadRight($leftWidth)
-                if ($leftStr.Length -gt $leftWidth) { $leftStr = $leftStr.Substring(0, $leftWidth) }
-            } else {
-                $leftStr = "".PadRight($leftWidth)
+            # --- Data refresh: one disk scan after any modal action, or when the index is >2s old ---
+            if ($ui.IndexDirty -or ((Get-Date) - $indexStamp).TotalSeconds -gt 2) {
+                $index = Get-NotebookIndex
+                $indexStamp = Get-Date
+                $indexVersion++
+                $ui.IndexDirty = $false
+                $itemsDirty = $true
             }
 
-            # Right column formatting
-            $rightStr = ""
-            $isAnsi = $false
-            $isHeader = $false
-            $isBullet = $false
-            $isDivider = $false
-            $isMeta = $false
-            $isArt = $false
+            # --- Visible tree: rebuilt from the cached index only when structure/expansion/sort changes ---
+            if ($itemsDirty) {
+                $prevPath = if ($selectedIndex -lt $treeItems.Count) { $treeItems[$selectedIndex].FullName } else { $null }
+                $list = [System.Collections.Generic.List[object]]::new()
+                Add-TreeItems -Index $index -Path $index.Root -Level 0 -Items $list
+                $treeItems = $list.ToArray()
+                $itemsDirty = $false
 
-            $pIndex = $previewScrollOffset + $r
-            if ($pIndex -lt $previewLines.Count -and $previewLines[$pIndex] -ne $null) {
-                $pLine = $previewLines[$pIndex]
-                if ($pLine.Contains([char]27)) {
-                    $isAnsi = $true
-                    $plain = $pLine -replace "\x1b\[[0-9;]*m", ""
-                    if ($plain.Length -gt $rightWidth) {
-                        $plain = $plain.Substring(0, $rightWidth)
-                        $rightStr = $plain
-                    } else {
-                        $padCount = [Math]::Max(0, $rightWidth - $plain.Length)
-                        $rightStr = $pLine + $rst + (" " * $padCount)
-                    }
-                } else {
-                    if ($pLine -match '^#+\s+(.*)' -or $pLine -match '^[=]+$') {
-                        $isHeader = $true
-                        $rightStr = " " + $pLine.Trim()
-                    } elseif ($pLine -match '^---') {
-                        $isDivider = $true
-                        $rightStr = " " + ($bHoriz * ($rightWidth - 4))
-                    } elseif ($pLine -match '^\s*-\s+(.*)') {
-                        $isBullet = $true
-                        $rightStr = " * " + ($pLine -replace '^\s*-\s+', '').Trim()
-                    } elseif ($pLine -match '^(title|date|tags|Location):') {
-                        $isMeta = $true
-                        $rightStr = "   " + $pLine.Trim()
-                    } elseif ($pLine -match '^\s*(\.T\.|\s*\[[o\^_\-][o\^_\-][o\^_\-]\]|/\|\[_\]\|\\|\s*\|\s{3}\|\s*\\|\s*d\s+b|\.----|''----)') {
-                        $isArt = $true
-                        $rightStr = " " + $pLine.TrimEnd()
-                    } else {
-                        $rightStr = " " + $pLine.TrimEnd()
-                    }
-                    $rightStr = Truncate-String -Str $rightStr -MaxLen ($rightWidth - 1)
-                    $rightStr = $rightStr.PadRight($rightWidth)
-                }
-            } else {
-                $rightStr = "".PadRight($rightWidth)
-            }
-
-            # Draw row into buffer
-            [void]$sb.Append($cDarkGray + $bVert + $rst)
-
-            $rowColor = if ($isRowSelected) { $cSelected } elseif ($isFolderRow) { $cFolder } else { $cSilver }
-            $coloredLeftStr = $rowColor + $leftStr + $rst
-            
-            # Subtly color the tree branches DarkGray
-            $b1 = [string][char]0x251C + [string][char]0x2500
-            $b2 = [string][char]0x2514 + [string][char]0x2500
-            if ($coloredLeftStr.Contains($b1)) {
-                $coloredLeftStr = $coloredLeftStr.Replace($b1, $cDarkGray + $b1 + $rowColor)
-            } elseif ($coloredLeftStr.Contains($b2)) {
-                $coloredLeftStr = $coloredLeftStr.Replace($b2, $cDarkGray + $b2 + $rowColor)
-            }
-
-            [void]$sb.Append($coloredLeftStr)
-
-            [void]$sb.Append($cDarkGray + $bVert + $rst)
-
-            if ($isAnsi) {
-                [void]$sb.Append($rightStr)
-            } elseif ($isHeader) {
-                [void]$sb.Append($cOrange + $rightStr + $rst)
-            } elseif ($isArt) {
-                [void]$sb.Append($cAmber + $rightStr + $rst)
-            } elseif ($isDivider) {
-                [void]$sb.Append($cDarkGray + $rightStr + $rst)
-            } elseif ($isBullet) {
-                [void]$sb.Append($cAmber + $rightStr + $rst)
-            } elseif ($isMeta) {
-                [void]$sb.Append($cGray + $rightStr + $rst)
-            } else {
-                [void]$sb.Append($cWhite + $rightStr + $rst)
-            }
-
-            [void]$sb.Append($cDarkGray + $bVert + $rst + "`r`n")
-        }
-
-        # 4. Box Footer
-        [void]$sb.AppendLine($cDarkGray + $bBotLeft + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $rightWidth) + $bBotRight + $rst)
-
-        # 5. Navigation Bar
-        [void]$sb.Append($navBar)
-
-        # 6. Atomic Write to Terminal (Zero-Flicker)
-        if ($script:needsFullClear) {
-            Clear-Host
-            $script:needsFullClear = $false
-        } else {
-            try { [Console]::SetCursorPosition(0, 0) } catch {}
-            [Console]::Write("$esc[H")
-        }
-        [Console]::Write($sb.ToString())
-
-        # Responsive Read Keystroke & Resize Polling
-        try {
-            $initialWidth = [Console]::WindowWidth
-            $key = $null
-            while ($true) {
-                if ([Console]::KeyAvailable) {
-                    $key = [Console]::ReadKey($true)
-                    break
-                }
-                if ([Console]::WindowWidth -ne $initialWidth) {
-                    $script:needsFullClear = $true
-                    break
-                }
-                Start-Sleep -Milliseconds 25
-            }
-        } catch {
-            break
-        }
-        
-        if ($null -eq $key) { continue }
-
-        switch ($key.Key) {
-            { $_ -in @("UpArrow", "W") } {
-                if ($selectedIndex -gt 0) { 
-                    $selectedIndex-- 
-                    if ($treeItems[$selectedIndex].Type -eq "Spacer" -and $selectedIndex -gt 0) {
-                        $selectedIndex--
-                    }
-                }
-            }
-            { $_ -in @("DownArrow", "S") } {
-                if ($selectedIndex -lt ($treeItems.Count - 1)) { 
-                    $selectedIndex++ 
-                    if ($treeItems[$selectedIndex].Type -eq "Spacer" -and $selectedIndex -lt ($treeItems.Count - 1)) {
-                        $selectedIndex++
-                    }
-                }
-            }
-            "PageUp" {
-                if ($previewLines.Count -gt $boxHeight) {
-                    $previewScrollOffset = [Math]::Max(0, $previewScrollOffset - [Math]::Max(1, $boxHeight - 3))
-                } else {
-                    $selectedIndex = [Math]::Max(0, $selectedIndex - 6)
-                    if ($treeItems[$selectedIndex].Type -eq "Spacer") {
-                        if ($selectedIndex -gt 0) { $selectedIndex-- } else { $selectedIndex++ }
-                    }
-                }
-            }
-            "PageDown" {
-                if ($previewLines.Count -gt $boxHeight) {
-                    $previewScrollOffset = [Math]::Min($maxPreviewScroll, $previewScrollOffset + [Math]::Max(1, $boxHeight - 3))
-                } else {
-                    $selectedIndex = [Math]::Min([Math]::Max(0, $treeItems.Count - 1), $selectedIndex + 6)
-                    if ($treeItems[$selectedIndex].Type -eq "Spacer") {
-                        if ($selectedIndex -lt ($treeItems.Count - 1)) { $selectedIndex++ } else { $selectedIndex-- }
-                    }
-                }
-            }
-            "J" {
-                if ($previewLines.Count -gt $boxHeight) {
-                    $previewScrollOffset = [Math]::Min($maxPreviewScroll, $previewScrollOffset + 3)
-                }
-            }
-            "K" {
-                if ($previewLines.Count -gt $boxHeight) {
-                    $previewScrollOffset = [Math]::Max(0, $previewScrollOffset - 3)
-                }
-            }
-            { $_ -in @("RightArrow", "D") } {
-                if ($activeItem -and $activeItem.Type -eq "Folder") {
-                    $script:ExpandedFolders[$activeItem.FullName] = $true
-                }
-            }
-            { $_ -in @("LeftArrow", "A") } {
-                if ($activeItem) {
-                    if ($activeItem.Type -eq "Folder" -and $activeItem.IsExpanded) {
-                        $script:ExpandedFolders[$activeItem.FullName] = $false
-                    } elseif ($activeItem.Level -gt 0) {
-                        # Move cursor up to parent folder
-                        $parentDir = Split-Path $activeItem.FullName -Parent
-                        for ($i = $selectedIndex; $i -ge 0; $i--) {
-                            if ($treeItems[$i].FullName -eq $parentDir) {
-                                $selectedIndex = $i
-                                break
-                            }
+                # Keep the cursor on the same item (or jump to a newly created/renamed one)
+                $targetPath = if ($ui.PendingSelectPath) { $ui.PendingSelectPath } else { $prevPath }
+                $ui.PendingSelectPath = $null
+                if ($targetPath) {
+                    for ($ti = 0; $ti -lt $treeItems.Count; $ti++) {
+                        if ($treeItems[$ti].FullName -eq $targetPath) {
+                            $selectedIndex = $ti
+                            break
                         }
                     }
                 }
             }
-            { $_ -in @("Enter", "Spacebar") } {
-                if ($activeItem) {
-                    if ($activeItem.Type -eq "Folder") {
-                        # Toggle expand/collapse
-                        $newState = -not ($script:ExpandedFolders.ContainsKey($activeItem.FullName) -and $script:ExpandedFolders[$activeItem.FullName])
-                        $script:ExpandedFolders[$activeItem.FullName] = $newState
-                    } else {
-                        Invoke-Modal { View-FullscreenNote (Get-Item $activeItem.FullName) }
-                    }
-                }
+
+            if ($selectedIndex -ge $treeItems.Count) {
+                $selectedIndex = [Math]::Max(0, $treeItems.Count - 1)
             }
-            "V" {
-                if ($activeItem -and $activeItem.Type -eq "Note") {
-                    Invoke-Modal { View-FullscreenNote (Get-Item $activeItem.FullName) }
-                }
+
+            # Terminal dimensions
+            $termWidth = 100
+            $termHeight = 26
+            try {
+                if ([Console]::WindowWidth -gt 20) { $termWidth = [Console]::WindowWidth }
+                if ([Console]::WindowHeight -gt 10) { $termHeight = [Console]::WindowHeight }
+            } catch {}
+
+            # Geometry calculations (Total box width = termWidth = 1 + leftWidth + 1 + rightWidth + 1)
+            $leftWidth = [Math]::Max(15, [Math]::Min(38, [Math]::Floor($termWidth * 0.35)))
+            $rightWidth = $termWidth - $leftWidth - 3
+
+            if ($rightWidth -lt 25) {
+                $rightWidth = 25
+                $leftWidth = $termWidth - $rightWidth - 3
+                if ($leftWidth -lt 5) { $leftWidth = 5 }
             }
-            "U" {
-                $releaseNotesPath = Join-Path $PSScriptRoot "RELEASE_NOTES.md"
-                if (Test-Path $releaseNotesPath) {
-                    Invoke-Modal { View-FullscreenNote -File (Get-Item $releaseNotesPath) -ReadOnly }
-                }
+
+            $usableWidth = [Math]::Max(20, $rightWidth - 3)
+
+            # --- Active item preview (cached; notes re-render only when the file changes on disk) ---
+            $activeItem = if ($selectedIndex -lt $treeItems.Count) { $treeItems[$selectedIndex] } else { $null }
+            $currentRightTitle = "No selection"
+            $newPreviewKey = $null
+
+            if ($activeItem -and $activeItem.Type -eq "Folder") {
+                $currentRightTitle = "Folder: " + $activeItem.Name
+                $newPreviewKey = "F|$($activeItem.FullName)|$($activeItem.IsExpanded)|$indexVersion|$usableWidth"
+            } elseif ($activeItem -and $activeItem.Type -eq "Note") {
+                $currentRightTitle = $activeItem.FileName
+                $stamp = if ([System.IO.File]::Exists($activeItem.FullName)) { [System.IO.File]::GetLastWriteTimeUtc($activeItem.FullName).Ticks } else { 0 }
+                $newPreviewKey = "N|$($activeItem.FullName)|$stamp|$usableWidth"
             }
-            "E" {
-                if ($activeItem -and $activeItem.Type -eq "Note") {
-                    Invoke-Modal { Edit-NoteFile -File (Get-Item $activeItem.FullName) }
+
+            if ($newPreviewKey -ne $previewKey) {
+                $previewLines = @()
+                if ($activeItem -and $activeItem.Type -eq "Folder") {
+                    $previewLines = @(Get-FolderPreviewLines -Item $activeItem -Index $index -UsableWidth $usableWidth)
+                } elseif ($activeItem -and $activeItem.Type -eq "Note" -and $stamp) {
+                    $rawLines = Get-Content -LiteralPath $activeItem.FullName -TotalCount 500 -Encoding UTF8 -ErrorAction SilentlyContinue
+                    $previewLines = @(Convert-MarkdownToTerminalLines -RawLines $rawLines -Width $usableWidth)
                 }
+                $previewKey = $newPreviewKey
             }
-            "O" {
-                if ($activeItem -and $activeItem.Type -eq "Note") {
-                    Open-InObsidian -File (Get-Item $activeItem.FullName)
-                }
+
+            # --- Layout: the nav bar always reserves its worst-case height to prevent UI bouncing ---
+            if ($termWidth -ne $navWidth) {
+                $worstNavLines = (Format-NavBar $NavSpec $termWidth).Lines
+                $navWidth = $termWidth
             }
-            "P" {
-                if ($activeItem -and $activeItem.Type -eq "Note") {
-                    Invoke-Modal { Append-ToNote -File (Get-Item $activeItem.FullName) }
-                }
+
+            # Fixed full-terminal layout: box height = terminal minus banner, box borders and nav bar
+            $boxHeight = [Math]::Max(2, $termHeight - 9 - $worstNavLines)
+            $usableHeight = [Math]::Max(1, $boxHeight - 1)
+            $needsScrollBadge = $previewLines.Count -gt $usableHeight
+
+            $navItems = @($NavSpec | Where-Object {
+                -not $_.When -or
+                ($_.When -eq "Scroll" -and $needsScrollBadge) -or
+                ($activeItem -and $_.When -eq $activeItem.Type)
+            })
+            $nav = Format-NavBar $navItems $termWidth
+            $navBar = $nav.Text + $rst + "$esc[J"
+            if ($nav.Lines -lt $worstNavLines) {
+                $navBar += ("`r`n" * ($worstNavLines - $nav.Lines))
             }
-            "T" {
-                if ($script:SortMode -eq "date") {
-                    $script:SortMode = "alpha"
+
+            if ($boxHeight -ne $lastBoxHeight -or $termWidth -ne $lastTermWidth) {
+                $ui.NeedsFullClear = $true
+                $lastBoxHeight = $boxHeight
+                $lastTermWidth = $termWidth
+            }
+
+            # Reset preview scroll when selecting a new item
+            if ($selectedIndex -ne $lastSelectedIndex) {
+                $previewScrollOffset = 0
+                $lastSelectedIndex = $selectedIndex
+            }
+
+            $maxPreviewScroll = [Math]::Max(0, $previewLines.Count - $usableHeight)
+            if ($previewScrollOffset -gt $maxPreviewScroll) {
+                $previewScrollOffset = $maxPreviewScroll
+            }
+
+            # Scrolling window for items list
+            $scrollOffset = 0
+            if ($selectedIndex -ge $usableHeight) {
+                $scrollOffset = $selectedIndex - $usableHeight + 1
+            }
+
+            # Assemble Frame in Memory (Flicker-Free Double-Buffering)
+            $sb = [System.Text.StringBuilder]::new()
+
+            # 1. Header Banner (Graphite to Flame Orange Horizon)
+            [void]$sb.AppendLine((Render-HeaderBanner $termWidth))
+
+            # 2. Box Header (100% Aligned Math)
+            $activeNbName = Get-ActiveNotebookName
+            $leftTitle = " WORKSPACE: $activeNbName "
+            $sortIcon = if ($script:SortMode -eq "alpha") { $gSortAlpha } else { $gSortDate }
+            $sortText = if ($script:SortMode -eq "alpha") { "A-Z" } else { "Date" }
+            $sortBadge = " $sortIcon $sortText "
+
+            $availLeft = $leftWidth - 1
+            if ($leftTitle.Length + $sortBadge.Length -gt $availLeft) {
+                $maxT = $availLeft - $sortBadge.Length - 1
+                if ($maxT -gt 5) {
+                    $leftTitle = Truncate-String -Str $leftTitle -MaxLen $maxT
                 } else {
-                    $script:SortMode = "date"
+                    $leftTitle = " NOTES "
                 }
-                try {
-                    @{ SortMode = $script:SortMode } | ConvertTo-Json | Set-Content -Path $notesConfigFile -Encoding UTF8
-                } catch {}
             }
-            "N" {
-                $targetFolder = $NotesDir
-                if ($activeItem) {
-                    if ($activeItem.Type -eq "Folder") {
-                        $targetFolder = $activeItem.FullName
-                    } elseif ($activeItem.Type -eq "Note") {
-                        $targetFolder = Split-Path -Parent $activeItem.FullName
+            $leftDashes = [Math]::Max(0, $availLeft - $leftTitle.Length - $sortBadge.Length)
+
+            $scrollNotice = ""
+            if ($previewLines.Count -gt $usableHeight) {
+                $visEnd = [Math]::Min($previewLines.Count, $previewScrollOffset + $usableHeight)
+                $scrollNotice = " [$($previewScrollOffset + 1)-$visEnd of $($previewLines.Count)] "
+            }
+
+            $rightTitle = " PREVIEW " + $scrollNotice
+            $rightDashes = $rightWidth - $rightTitle.Length - 1
+            if ($rightDashes -lt 0) {
+                $rightTitle = " PREVIEW "
+                $rightDashes = [Math]::Max(0, $rightWidth - $rightTitle.Length - 1)
+            }
+
+            [void]$sb.Append($cDarkGray + $bTopLeft + $bHoriz + $cOrange + $leftTitle + $cDarkGray + ($bHoriz * $leftDashes) + $cAmber + $sortBadge + $cDarkGray + $bTopT + $bHoriz + $cOrange + $rightTitle + $cDarkGray + ($bHoriz * $rightDashes) + $bTopRight + $rst + "`r`n")
+
+            # 3. Render Rows
+            for ($r = 0; $r -lt $boxHeight; $r++) {
+                if ($r -eq 0) {
+                    # Top padding row to give breathing room beneath headers
+                    $blankLeft = $vBar + (" " * $leftWidth) + $rst
+                    $blankRight = $vBar + (" " * $rightWidth) + $rst
+                    [void]$sb.Append($blankLeft).Append($blankRight).Append($vBar + "`r`n")
+                    continue
+                }
+
+                $itemIdx = $scrollOffset + ($r - 1)
+
+                # Left column formatting
+                $leftStr = ""
+                $rowColor = $cSilver
+                $branchGlyph = $null
+                if ($itemIdx -lt $treeItems.Count) {
+                    $cur = $treeItems[$itemIdx]
+                    $indent = "  " * $cur.Level
+                    if ($cur.Type -eq "Folder") {
+                        $rowColor = $cFolder
+                        $arrow = if ($cur.IsExpanded) { "$gArrowDown " } else { "$gArrowRight " }
+                        $icon = if ($cur.IsExpanded) { "$gFolderOpen " } else { "$gFolderClosed " }
+                        $countLabel = " ($($cur.ItemCount))"
+                        $dispName = Truncate-String -Str $cur.Name -MaxLen ($leftWidth - $indent.Length - 7 - $countLabel.Length)
+                        $leftStr = "$indent$arrow$icon$dispName$countLabel"
+                    } elseif ($cur.Type -eq "Note") {
+                        $branch = "  "
+                        if ($cur.Level -gt 0) {
+                            $branchGlyph = if ($cur.IsLastSibling) { $gBranchEnd } else { $gBranchMid }
+                            $branch = "$branchGlyph "
+                        }
+                        $dispName = Truncate-String -Str $cur.Name -MaxLen ($leftWidth - $indent.Length - 6)
+                        $leftStr = "$indent$branch$gFileIcon $dispName"
+                    }
+                    # Spacers render blank and can never be highlighted
+                    if ($itemIdx -eq $selectedIndex -and $cur.Type -ne "Spacer") { $rowColor = $cSelected }
+                }
+                $leftStr = $leftStr.PadRight($leftWidth)
+                if ($leftStr.Length -gt $leftWidth) { $leftStr = $leftStr.Substring(0, $leftWidth) }
+
+                $coloredLeftStr = $rowColor + $leftStr + $rst
+                # Subtly color the tree branches DarkGray
+                if ($branchGlyph) {
+                    $coloredLeftStr = $coloredLeftStr.Replace($branchGlyph, $cDarkGray + $branchGlyph + $rowColor)
+                }
+
+                # Right column formatting (preview lines are pre-styled ANSI, or empty)
+                $pIndex = $previewScrollOffset + ($r - 1)
+                $pLine = if ($pIndex -lt $previewLines.Count) { $previewLines[$pIndex] } else { "" }
+                $rightStr = Format-AnsiCell $pLine $rightWidth
+
+                # Draw row into buffer
+                [void]$sb.Append($vBar).Append($coloredLeftStr).Append($vBar).Append($rightStr).Append($vBar + "`r`n")
+            }
+
+            # 4. Box Footer
+            [void]$sb.AppendLine($cDarkGray + $bBotLeft + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $rightWidth) + $bBotRight + $rst)
+
+            # 5. Navigation Bar
+            [void]$sb.Append($navBar)
+
+            # 6. Atomic Write to Terminal (Zero-Flicker)
+            if ($ui.NeedsFullClear) {
+                Clear-Host
+                $ui.NeedsFullClear = $false
+            } else {
+                try { [Console]::SetCursorPosition(0, 0) } catch {}
+                [Console]::Write("$esc[H")
+            }
+            [Console]::Write($sb.ToString())
+
+            # Responsive Read Keystroke & Resize Polling
+            try { $key = Read-KeyOrResize } catch { break }
+            if ($null -eq $key) {
+                $ui.NeedsFullClear = $true
+                continue
+            }
+
+            switch ($key.Key) {
+                { $_ -in @("UpArrow", "W") } {
+                    if ($selectedIndex -gt 0) {
+                        $selectedIndex--
+                        if ($treeItems[$selectedIndex].Type -eq "Spacer" -and $selectedIndex -gt 0) {
+                            $selectedIndex--
+                        }
                     }
                 }
-                if ($targetFolder -and (Test-Path $targetFolder)) {
-                    $script:ExpandedFolders[$targetFolder] = $true
-                }
-                $createdPath = $null
-                Invoke-Modal { $script:createdPath = New-InteractiveNote -DestinationDir $targetFolder }
-                if ($script:createdPath) {
-                    $pendingSelectPath = $script:createdPath
-                }
-            }
-            "F" {
-                $targetParent = $NotesDir
-                if ($activeItem) {
-                    if ($activeItem.Type -eq "Folder") {
-                        $targetParent = $activeItem.FullName
-                    } elseif ($activeItem.Type -eq "Note") {
-                        $targetParent = Split-Path -Parent $activeItem.FullName
+                { $_ -in @("DownArrow", "S") } {
+                    if ($selectedIndex -lt ($treeItems.Count - 1)) {
+                        $selectedIndex++
+                        if ($treeItems[$selectedIndex].Type -eq "Spacer" -and $selectedIndex -lt ($treeItems.Count - 1)) {
+                            $selectedIndex++
+                        }
                     }
                 }
-                if ($targetParent -and (Test-Path $targetParent)) {
-                    $script:ExpandedFolders[$targetParent] = $true
+                "PageUp" {
+                    if ($previewLines.Count -gt $boxHeight) {
+                        $previewScrollOffset = [Math]::Max(0, $previewScrollOffset - [Math]::Max(1, $boxHeight - 3))
+                    } else {
+                        $selectedIndex = [Math]::Max(0, $selectedIndex - 6)
+                        if ($treeItems[$selectedIndex].Type -eq "Spacer") {
+                            if ($selectedIndex -gt 0) { $selectedIndex-- } else { $selectedIndex++ }
+                        }
+                    }
                 }
-                $createdFolder = $null
-                Invoke-Modal { $script:createdFolder = New-FolderPrompt -ParentDir $targetParent }
-                if ($script:createdFolder) {
-                    $pendingSelectPath = $script:createdFolder
+                "PageDown" {
+                    if ($previewLines.Count -gt $boxHeight) {
+                        $previewScrollOffset = [Math]::Min($maxPreviewScroll, $previewScrollOffset + [Math]::Max(1, $boxHeight - 3))
+                    } else {
+                        $selectedIndex = [Math]::Min([Math]::Max(0, $treeItems.Count - 1), $selectedIndex + 6)
+                        if ($treeItems[$selectedIndex].Type -eq "Spacer") {
+                            if ($selectedIndex -lt ($treeItems.Count - 1)) { $selectedIndex++ } else { $selectedIndex-- }
+                        }
+                    }
                 }
-            }
-            "R" {
-                if ($activeItem) {
-                    Invoke-Modal { Rename-ItemPrompt -Item $activeItem }
+                "J" {
+                    if ($previewLines.Count -gt $boxHeight) {
+                        $previewScrollOffset = [Math]::Min($maxPreviewScroll, $previewScrollOffset + 3)
+                    }
                 }
-            }
-            { $_ -in @("X", "Delete") } {
-                if ($activeItem) {
-                    Invoke-Modal { Delete-ItemPrompt -Item $activeItem }
+                "K" {
+                    if ($previewLines.Count -gt $boxHeight) {
+                        $previewScrollOffset = [Math]::Max(0, $previewScrollOffset - 3)
+                    }
                 }
-            }
-            "L" {
-                Invoke-Modal { Quick-Log }
-            }
-            "Oem2" { # '/' key
-                Invoke-Modal { Search-NotesPrompt }
-            }
-            "B" { # Open Notes folder in File Explorer (Browse)
-                Invoke-Item $NotesDir
-            }
-            "Escape" {
-                return
-            }
-            "Q" {
-                return
-            }
-            default {
-                # Ignore unrecognized keys
+                { $_ -in @("RightArrow", "D") } {
+                    if ($activeItem -and $activeItem.Type -eq "Folder" -and -not $activeItem.IsExpanded) {
+                        $script:CollapsedFolders.Remove($activeItem.FullName)
+                        $itemsDirty = $true
+                    }
+                }
+                { $_ -in @("LeftArrow", "A") } {
+                    if ($activeItem) {
+                        if ($activeItem.Type -eq "Folder" -and $activeItem.IsExpanded) {
+                            $script:CollapsedFolders[$activeItem.FullName] = $true
+                            $itemsDirty = $true
+                        } elseif ($activeItem.Level -gt 0) {
+                            # Move cursor up to parent folder
+                            $parentDir = Split-Path $activeItem.FullName -Parent
+                            for ($i = $selectedIndex; $i -ge 0; $i--) {
+                                if ($treeItems[$i].FullName -eq $parentDir) {
+                                    $selectedIndex = $i
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
+                { $_ -in @("Enter", "Spacebar") } {
+                    if ($activeItem -and $activeItem.Type -eq "Folder") {
+                        # Toggle expand/collapse
+                        if ($activeItem.IsExpanded) { $script:CollapsedFolders[$activeItem.FullName] = $true }
+                        else { $script:CollapsedFolders.Remove($activeItem.FullName) }
+                        $itemsDirty = $true
+                    } else {
+                        $note = Get-ActiveNoteFile
+                        if ($note) { Invoke-Modal { View-FullscreenNote $note } }
+                    }
+                }
+                "V" {
+                    $note = Get-ActiveNoteFile
+                    if ($note) { Invoke-Modal { View-FullscreenNote $note } }
+                }
+                "U" {
+                    $releaseNotesPath = Join-Path $PSScriptRoot "RELEASE_NOTES.md"
+                    if (Test-Path -LiteralPath $releaseNotesPath) {
+                        Invoke-Modal { View-FullscreenNote -File (Get-Item -LiteralPath $releaseNotesPath) -ReadOnly }
+                    }
+                }
+                "E" {
+                    $note = Get-ActiveNoteFile
+                    if ($note) { Invoke-Modal { Edit-NoteFile -File $note } }
+                }
+                "O" {
+                    $note = Get-ActiveNoteFile
+                    if ($note) { Open-InObsidian -File $note }
+                }
+                "P" {
+                    $note = Get-ActiveNoteFile
+                    if ($note) { Invoke-Modal { Append-ToNote -File $note } }
+                }
+                "T" {
+                    $script:SortMode = if ($script:SortMode -eq "date") { "alpha" } else { "date" }
+                    $itemsDirty = $true
+                    try {
+                        Write-Utf8File -Path (Join-Path $script:NotesDir ".config.json") -Text ((@{ SortMode = $script:SortMode } | ConvertTo-Json) + [Environment]::NewLine)
+                    } catch {}
+                }
+                "B" {
+                    Invoke-Modal { Switch-NotebookModal }
+                }
+                "N" {
+                    $targetFolder = Get-ContextFolder $activeItem
+                    $script:CollapsedFolders.Remove($targetFolder)
+                    Invoke-Modal { New-InteractiveNote -DestinationDir $targetFolder }
+                }
+                "F" {
+                    $targetParent = Get-ContextFolder $activeItem
+                    $script:CollapsedFolders.Remove($targetParent)
+                    Invoke-Modal { New-FolderPrompt -ParentDir $targetParent }
+                }
+                "R" {
+                    if ($activeItem -and $activeItem.Type -ne "Spacer") {
+                        Invoke-Modal { Rename-ItemPrompt -Item $activeItem }
+                    }
+                }
+                { $_ -in @("X", "Delete") } {
+                    if ($activeItem -and $activeItem.Type -ne "Spacer") {
+                        Invoke-Modal { Delete-ItemPrompt -Item $activeItem }
+                    }
+                }
+                "L" {
+                    Invoke-Modal { Quick-Log }
+                }
+                "Oem2" { # '/' key
+                    Invoke-Modal { Search-NotesPrompt }
+                }
+                { $_ -in @("Escape", "Q") } {
+                    return
+                }
+                default {
+                    # Ignore unrecognized keys
+                }
             }
         }
-    }
     } finally {
-        try { [Console]::CursorVisible = $true } catch {}
-        [Console]::Write("$esc[?25h")
+        Set-CursorVisible $true
         Clear-Host
     }
 }
 
 # --- CLI Argument Processing ---
-$allArgs = if ($ArgsList) { ($ArgsList -join " ") } else { "" }
+$allArgs = if ($SubCommand -and $ArgsList) { "$SubCommand " + ($ArgsList -join " ") } elseif ($SubCommand) { $SubCommand } elseif ($ArgsList) { ($ArgsList -join " ") } else { "" }
+
+function Find-NoteByName([string]$Target) {
+    $pattern = "*" + [WildcardPattern]::Escape($Target) + "*"
+    return Get-AllNotes | Where-Object { $_.BaseName -like $pattern -or $_.FullName -like $pattern } | Select-Object -First 1
+}
 
 if (-not [string]::IsNullOrWhiteSpace($Command)) {
     switch ($Command.ToLower()) {
@@ -1894,52 +2086,39 @@ if (-not [string]::IsNullOrWhiteSpace($Command)) {
             New-FolderPrompt
             return
         }
-        "log" {
-            Quick-Log -Text $allArgs
-            return
-        }
-        "quick" {
+        { $_ -in @("log", "quick") } {
             Quick-Log -Text $allArgs
             return
         }
         "obsidian" {
-            $notes = Get-AllNotes
-            $target = $allArgs
-            if ([string]::IsNullOrWhiteSpace($target)) {
-                if ($notes -and $notes.Count -gt 0) { Open-InObsidian -File $notes[0] }
-            } else {
-                $match = $notes | Where-Object { $_.BaseName -like "*$target*" -or $_.FullName -like "*$target*" } | Select-Object -First 1
-                if ($match) { Open-InObsidian -File $match }
-            }
+            $match = if ([string]::IsNullOrWhiteSpace($allArgs)) { Get-AllNotes | Select-Object -First 1 } else { Find-NoteByName $allArgs }
+            if ($match) { Open-InObsidian -File $match }
             return
         }
         "list" {
-            $notes = Get-AllNotes
-            if (-not $notes) {
-                Write-Host "No notes found in $NotesDir" -ForegroundColor DarkYellow
+            $notes = @(Get-AllNotes)
+            if ($notes.Count -eq 0) {
+                Write-Host "No notes found in $script:NotesDir" -ForegroundColor DarkYellow
                 return
             }
             Write-Host ("{0,-4}  {1,-36}  {2,-18}" -f "#", "Path & Title", "Last Modified") -ForegroundColor Cyan
             Write-Host ("{0,-4}  {1,-36}  {2,-18}" -f "-", "------------", "-------------") -ForegroundColor DarkGray
-            $i = 1
-            foreach ($n in $notes) {
-                $rel = $n.FullName.Substring($NotesDir.Length).TrimStart('\', '/')
-                $display = Truncate-String -Str $rel -MaxLen 36
-                $mod = $n.LastWriteTime.ToString("yyyy-MM-dd HH:mm")
-                Write-Host ("{0,-4}  {1,-36}  {2,-18}" -f "[$i]", $display, $mod) -ForegroundColor White
-                $i++
+            for ($i = 0; $i -lt $notes.Count; $i++) {
+                $display = Truncate-String -Str (Get-RelativeNotePath $notes[$i].FullName) -MaxLen 36
+                $mod = $notes[$i].LastWriteTime.ToString("yyyy-MM-dd HH:mm")
+                Write-Host ("{0,-4}  {1,-36}  {2,-18}" -f "[$($i + 1)]", $display, $mod) -ForegroundColor White
             }
             return
         }
         "view" {
-            $notes = Get-AllNotes
             $target = $allArgs
             $selectedFile = $null
             if ($target -match '^\d+$') {
+                $notes = @(Get-AllNotes)
                 $idx = [int]$target - 1
                 if ($idx -ge 0 -and $idx -lt $notes.Count) { $selectedFile = $notes[$idx] }
             } else {
-                $selectedFile = $notes | Where-Object { $_.BaseName -like "*$target*" -or $_.FullName -like "*$target*" } | Select-Object -First 1
+                $selectedFile = Find-NoteByName $target
             }
             if ($selectedFile) {
                 View-FullscreenNote $selectedFile
@@ -1953,23 +2132,131 @@ if (-not [string]::IsNullOrWhiteSpace($Command)) {
             return
         }
         "open" {
-            Invoke-Item $NotesDir
+            Invoke-Item $script:NotesDir
             return
+        }
+        { $_ -in @("notebook", "notebooks", "workspace", "workspaces") } {
+            $subAction = if ($SubCommand) { $SubCommand.ToLower() } else { "list" }
+            $cfg = Get-GlobalNotebookConfig
+            switch ($subAction) {
+                "list" {
+                    Write-Host "`nConfigured Notebook Workspaces:" -ForegroundColor Cyan
+                    Write-Host ("{0,-16}  {1,-45}  {2}" -f "Name", "Path", "Status") -ForegroundColor Cyan
+                    Write-Host ("{0,-16}  {1,-45}  {2}" -f "----", "----", "------") -ForegroundColor DarkGray
+                    foreach ($nb in $cfg.Notebooks) {
+                        $isActive = ($nb.Path.TrimEnd('\', '/') -eq $script:NotesDir.TrimEnd('\', '/'))
+                        $statusTag = if ($isActive) { "* Active" } else { "" }
+                        Write-Host ("{0,-16}  {1,-45}  {2}" -f $nb.Name, $nb.Path, $statusTag) -ForegroundColor White
+                    }
+                    return
+                }
+                "switch" {
+                    $targetNb = if ($ArgsList) { $ArgsList[0] } else { "" }
+                    if ($targetNb) {
+                        Set-ActiveNotebook -Target $targetNb
+                        Write-Host "Active notebook switched to: $(Get-ActiveNotebookName) ($script:NotesDir)" -ForegroundColor Green
+                    } else {
+                        Write-Host "Usage: note notebook switch <name|path>" -ForegroundColor Red
+                    }
+                    return
+                }
+                "add" {
+                    if ($ArgsList.Count -ge 2) {
+                        $nbName = $ArgsList[0]
+                        $nbPath = $ArgsList[1]
+                        Set-ActiveNotebook -Target $nbPath
+                        $updatedCfg = Get-GlobalNotebookConfig
+                        $newList = [System.Collections.Generic.List[object]]::new()
+                        foreach ($item in $updatedCfg.Notebooks) {
+                            if ($item.Path.TrimEnd('\', '/') -eq $script:NotesDir.TrimEnd('\', '/')) {
+                                $newList.Add(@{ Name = $nbName; Path = $script:NotesDir })
+                            } else {
+                                $newList.Add($item)
+                            }
+                        }
+                        $updatedCfg.Notebooks = $newList.ToArray()
+                        Save-GlobalNotebookConfig $updatedCfg
+                        Write-Host "Added notebook: $nbName -> $script:NotesDir" -ForegroundColor Green
+                    } else {
+                        Write-Host "Usage: note notebook add <name> <path>" -ForegroundColor Red
+                    }
+                    return
+                }
+                "remove" {
+                    $targetName = if ($ArgsList) { $ArgsList[0] } else { "" }
+                    if ($targetName) {
+                        $newList = [System.Collections.Generic.List[object]]::new()
+                        $removed = $false
+                        foreach ($nb in $cfg.Notebooks) {
+                            if ($nb.Name.ToLower() -eq $targetName.ToLower()) {
+                                if ($nb.Path.TrimEnd('\', '/') -eq $script:NotesDir.TrimEnd('\', '/')) {
+                                    Write-Host "Cannot remove the currently active notebook. Switch to another notebook first." -ForegroundColor Red
+                                    return
+                                }
+                                $removed = $true
+                            } else {
+                                $newList.Add($nb)
+                            }
+                        }
+                        if ($removed) {
+                            $cfg.Notebooks = $newList.ToArray()
+                            Save-GlobalNotebookConfig $cfg
+                            Write-Host "Removed notebook '$targetName'" -ForegroundColor Green
+                        } else {
+                            Write-Host "Notebook '$targetName' not found." -ForegroundColor Red
+                        }
+                    } else {
+                        Write-Host "Usage: note notebook remove <name>" -ForegroundColor Red
+                    }
+                    return
+                }
+                default {
+                    Start-NotebookBrowser
+                    return
+                }
+            }
         }
         "help" {
             Write-Host "Terminal Notebook Usage:" -ForegroundColor Cyan
             Write-Host "  note                      Open Notebook Browser (interactive tree view)"
+            Write-Host "  note browse               Open Notebook Browser"
+            Write-Host "  note <name|path>          Switch to named notebook (e.g. note work) & open browser"
+            Write-Host "  note -Notebook <path>     Open specific notebook folder"
+            Write-Host "  note notebook list        List all configured notebook workspaces"
+            Write-Host "  note notebook switch <n>  Switch active notebook workspace"
+            Write-Host "  note notebook add <n> <p> Register a new notebook workspace"
             Write-Host "  note `"quick thought`"      Instantly append a thought to today's log"
+            Write-Host "  note log <text>           Append a thought to today's log (alias: quick)"
             Write-Host "  note new [title]          Create a new markdown note"
             Write-Host "  note folder               Create a new folder"
-            Write-Host "  note list                 List all notes and subfolders"
-            Write-Host "  note view <#>             View note in fullscreen reader"
+            Write-Host "  note list                 List all notes with their numbers"
+            Write-Host "  note view <#|name>        View note in fullscreen reader"
             Write-Host "  note obsidian [name]      Open note in Obsidian"
             Write-Host "  note search               Search inside notes"
             Write-Host "  note open                 Open Notes folder in File Explorer"
             return
         }
         default {
+            # Check if Command matches a registered notebook profile name or directory
+            $cfg = Get-GlobalNotebookConfig
+            $matched = $false
+            foreach ($nb in $cfg.Notebooks) {
+                if ($nb.Name.ToLower() -eq $Command.ToLower()) {
+                    Set-ActiveNotebook -Target $nb.Path
+                    $matched = $true
+                    break
+                }
+            }
+            if (-not $matched -and (Test-Path -LiteralPath $Command -PathType Container)) {
+                Set-ActiveNotebook -Target $Command
+                $matched = $true
+            }
+
+            if ($matched) {
+                Start-NotebookBrowser
+                return
+            }
+
             $fullNote = "$Command $allArgs".Trim()
             Quick-Log -Text $fullNote
             return
@@ -1979,4 +2266,3 @@ if (-not [string]::IsNullOrWhiteSpace($Command)) {
 
 # Default action when typing `note` or `notes`: Open the Notebook Browser!
 Start-NotebookBrowser
-
