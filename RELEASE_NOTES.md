@@ -1,11 +1,17 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.7
+**Date:** 2026-10-02
+
+### Keybindings
+- **Release Notes Hotkey Fix:** Fixed a hotkey collision where mapping Release Notes to `W` interfered with `W/A/S/D` arrow-key navigation. "What's New" has been renamed to "Updates" and remapped to `U`.
+
 ## Version 2.6.6
 **Date:** 2026-10-02
 
 ### Keybindings
 - **Fullscreen Note:** Remapped `V` to open the currently selected Note in the Fullscreen Reader (adding a fast explicit alternative to `Enter`).
-- **Release Notes:** Shifted the "What's New" hotkey from `V` to `W`.
+- **Release Notes:** Shifted the release notes hotkey from `V` to `W` (Reverted in 2.6.7).
 
 ## Version 2.6.5
 **Date:** 2026-10-02

@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.6"
+$AppVersion = "2.6.7"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1423,7 +1423,7 @@ function Start-NotebookBrowser {
 
         $navItems += @(
             @("[N]", " Note "), @("[F]", " Folder "),
-            @("[W]", " What's New "), @("[R]", " Rename "),
+            @("[U]", " Updates "), @("[R]", " Rename "),
             @("[X]", " Del "), @("[Q]", " Exit")
         )
 
@@ -1431,7 +1431,7 @@ function Start-NotebookBrowser {
         $worstItems = @(
             @("[W/S]", " Move "), @("[A/D]", " Folders "), @("[J/K]", " Scroll "), @("[T]", " Sort "),
             @("[Enter]", " Expand "), @("[Enter]", " View "), @("[V]", " Fullscreen "), @("[E]", " Edit "), @("[O]", " Obsidian "),
-            @("[N]", " Note "), @("[F]", " Folder "), @("[W]", " What's New "),
+            @("[N]", " Note "), @("[F]", " Folder "), @("[U]", " Updates "),
             @("[R]", " Rename "), @("[X]", " Del "), @("[Q]", " Exit")
         )
         $worstLen = 1
@@ -1751,7 +1751,7 @@ function Start-NotebookBrowser {
                     Invoke-Modal { View-FullscreenNote (Get-Item $activeItem.FullName) }
                 }
             }
-            "W" {
+            "U" {
                 $releaseNotesPath = Join-Path $PSScriptRoot "RELEASE_NOTES.md"
                 if (Test-Path $releaseNotesPath) {
                     Invoke-Modal { View-FullscreenNote -File (Get-Item $releaseNotesPath) -ReadOnly }
