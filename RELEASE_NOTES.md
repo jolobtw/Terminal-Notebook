@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.2.0
+**Date:** 2026-10-03
+
+### Navigation Tree Enhancements
+- **Immediate Note Placement:** Notes contained within a folder are now displayed indented immediately right after their parent folder, above any subfolders.
+- **Connected Folder Tree Lines:** Connected parent folders to child folders and notes with full vertical and branch tree lines (`├──`, `└──`, `│`), providing clear visual hierarchy across nested directory structures.
+
 ## Version 3.1.3
 **Date:** 2026-10-03
 

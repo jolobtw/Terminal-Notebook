@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.1.3"
+$AppVersion = "3.2.0"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1342,51 +1342,109 @@ function Get-NotebookIndex {
 
 function Add-TreeItems {
     # Appends the visible (expanded) hierarchy under $Path to the $Items list
-    param([hashtable]$Index, [string]$Path, [int]$Level, $Items)
+    param(
+        [hashtable]$Index,
+        [string]$Path,
+        [int]$Level,
+        $Items,
+        [bool[]]$AncestorsHasNext = @()
+    )
 
-    # 1. Subfolders first (sorted by SortMode: date or alpha)
-    $subDirs = @(Sort-NoteFolders $Index.ChildDirs[$Path])
-    foreach ($d in $subDirs) {
-        $isExpanded = -not $script:CollapsedFolders.ContainsKey($d.FullName)
-        $Items.Add([PSCustomObject]@{
-            Type        = "Folder"
-            Name        = $d.Name
-            FullName    = $d.FullName
-            Level       = $Level
-            IsExpanded  = $isExpanded
-            ItemCount   = [int]$Index.NoteCounts[$d.FullName]
-        })
-
-        if ($isExpanded) {
-            Add-TreeItems -Index $Index -Path $d.FullName -Level ($Level + 1) -Items $Items
-        }
-    }
-
-    # 2. Markdown files in this directory (sorted by SortMode: date or alpha)
+    # 1. Direct Markdown files in this directory (sorted by SortMode: date or alpha)
     $files = @(Sort-NoteFiles $Index.ChildFiles[$Path])
 
-    # Add Spacer if we have both folders and root notes
+    # 2. Direct Subfolders in this directory (sorted by SortMode: date or alpha)
+    $subDirs = @(Sort-NoteFolders $Index.ChildDirs[$Path])
+
+    # Add Spacer at root (Level 0) if we have both root notes and root subfolders
     if ($Level -eq 0 -and $subDirs.Count -gt 0 -and $files.Count -gt 0) {
+        for ($i = 0; $i -lt $files.Count; $i++) {
+            $f = $files[$i]
+            $Items.Add([PSCustomObject]@{
+                Type             = "Note"
+                Name             = (Format-NoteTitle $f)
+                FileName         = $f.Name
+                FullName         = $f.FullName
+                Level            = 0
+                IsLastSibling    = ($i -eq $files.Count - 1)
+                AncestorsHasNext = @()
+            })
+        }
+
         $Items.Add([PSCustomObject]@{
-            Type       = "Spacer"
-            Name       = ""
-            FullName   = ""
-            Level      = 0
-            IsExpanded = $false
-            ItemCount  = 0
+            Type             = "Spacer"
+            Name             = ""
+            FullName         = ""
+            Level            = 0
+            IsExpanded       = $false
+            ItemCount        = 0
+            IsLastSibling    = $false
+            AncestorsHasNext = @()
         })
+
+        for ($dIdx = 0; $dIdx -lt $subDirs.Count; $dIdx++) {
+            $d = $subDirs[$dIdx]
+            $isExpanded = -not $script:CollapsedFolders.ContainsKey($d.FullName)
+            $isLast = ($dIdx -eq $subDirs.Count - 1)
+            $Items.Add([PSCustomObject]@{
+                Type             = "Folder"
+                Name             = $d.Name
+                FullName         = $d.FullName
+                Level            = 0
+                IsExpanded       = $isExpanded
+                ItemCount        = [int]$Index.NoteCounts[$d.FullName]
+                IsLastSibling    = $isLast
+                AncestorsHasNext = @()
+            })
+
+            if ($isExpanded) {
+                $nextAncestors = @(-not $isLast)
+                Add-TreeItems -Index $Index -Path $d.FullName -Level 1 -Items $Items -AncestorsHasNext $nextAncestors
+            }
+        }
+        return
     }
 
+    $totalChildren = $files.Count + $subDirs.Count
+    $childIdx = 0
+
+    # Direct Notes first (displayed indented right after folder that contains them)
     for ($i = 0; $i -lt $files.Count; $i++) {
         $f = $files[$i]
+        $isLast = ($childIdx -eq ($totalChildren - 1))
         $Items.Add([PSCustomObject]@{
-            Type          = "Note"
-            Name          = (Format-NoteTitle $f)
-            FileName      = $f.Name
-            FullName      = $f.FullName
-            Level         = $Level
-            IsLastSibling = ($i -eq $files.Count - 1)
+            Type             = "Note"
+            Name             = (Format-NoteTitle $f)
+            FileName         = $f.Name
+            FullName         = $f.FullName
+            Level            = $Level
+            IsLastSibling    = $isLast
+            AncestorsHasNext = $AncestorsHasNext
         })
+        $childIdx++
+    }
+
+    # Direct Subfolders
+    for ($dIdx = 0; $dIdx -lt $subDirs.Count; $dIdx++) {
+        $d = $subDirs[$dIdx]
+        $isExpanded = -not $script:CollapsedFolders.ContainsKey($d.FullName)
+        $isLast = ($childIdx -eq ($totalChildren - 1))
+        $Items.Add([PSCustomObject]@{
+            Type             = "Folder"
+            Name             = $d.Name
+            FullName         = $d.FullName
+            Level            = $Level
+            IsExpanded       = $isExpanded
+            ItemCount        = [int]$Index.NoteCounts[$d.FullName]
+            IsLastSibling    = $isLast
+            AncestorsHasNext = $AncestorsHasNext
+        })
+        $childIdx++
+
+        if ($isExpanded) {
+            $nextAncestors = $AncestorsHasNext + (-not $isLast)
+            Add-TreeItems -Index $Index -Path $d.FullName -Level ($Level + 1) -Items $Items -AncestorsHasNext $nextAncestors
+        }
     }
 }
 
@@ -2239,24 +2297,36 @@ function Start-NotebookBrowser {
                     $leftStr = ""
                     $rowColor = $cSilver
                     $branchGlyph = $null
+                    $cur = $null
                     if ($itemIdx -lt $treeItems.Count) {
                         $cur = $treeItems[$itemIdx]
-                        $indent = "  " * $cur.Level
+                        $treePrefix = ""
+                        if ($cur.Level -gt 0) {
+                            if ($cur.AncestorsHasNext -and $cur.AncestorsHasNext.Count -gt 0) {
+                                for ($a = 0; $a -lt $cur.AncestorsHasNext.Count; $a++) {
+                                    if ($cur.AncestorsHasNext[$a]) {
+                                        $treePrefix += "$bVert  "
+                                    } else {
+                                        $treePrefix += "   "
+                                    }
+                                }
+                            }
+                            $branchGlyph = if ($cur.IsLastSibling) { $gBranchEnd } else { $gBranchMid }
+                            $treePrefix += "$branchGlyph "
+                        }
+
                         if ($cur.Type -eq "Folder") {
                             $rowColor = $cFolder
                             $arrow = if ($cur.IsExpanded) { "$gArrowDown " } else { "$gArrowRight " }
                             $icon = if ($cur.IsExpanded) { "$gFolderOpen " } else { "$gFolderClosed " }
                             $countLabel = " ($($cur.ItemCount))"
-                            $dispName = Truncate-String -Str $cur.Name -MaxLen ($leftWidth - $indent.Length - 7 - $countLabel.Length)
-                            $leftStr = "$indent$arrow$icon$dispName$countLabel"
+                            $maxNameLen = [Math]::Max(1, $leftWidth - $treePrefix.Length - 4 - $countLabel.Length)
+                            $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
+                            $leftStr = "$treePrefix$arrow$icon$dispName$countLabel"
                         } elseif ($cur.Type -eq "Note") {
-                            $branch = "  "
-                            if ($cur.Level -gt 0) {
-                                $branchGlyph = if ($cur.IsLastSibling) { $gBranchEnd } else { $gBranchMid }
-                                $branch = "$branchGlyph "
-                            }
-                            $dispName = Truncate-String -Str $cur.Name -MaxLen ($leftWidth - $indent.Length - 6)
-                            $leftStr = "$indent$branch$gFileIcon $dispName"
+                            $maxNameLen = [Math]::Max(1, $leftWidth - $treePrefix.Length - 3)
+                            $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
+                            $leftStr = "$treePrefix$gFileIcon $dispName"
                         }
                         # Spacers render blank and can never be highlighted
                         if ($itemIdx -eq $selectedIndex -and $cur.Type -ne "Spacer") { $rowColor = $cSelected }
@@ -2266,8 +2336,13 @@ function Start-NotebookBrowser {
 
                     $coloredLeftStr = $rowColor + $leftStr + $rst
                     # Subtly color the tree branches DarkGray
-                    if ($branchGlyph) {
-                        $coloredLeftStr = $coloredLeftStr.Replace($branchGlyph, $cDarkGray + $branchGlyph + $rowColor)
+                    if ($cur -and $cur.Level -gt 0) {
+                        if ($bVert) {
+                            $coloredLeftStr = $coloredLeftStr.Replace($bVert, $cDarkGray + $bVert + $rowColor)
+                        }
+                        if ($branchGlyph) {
+                            $coloredLeftStr = $coloredLeftStr.Replace($branchGlyph, $cDarkGray + $branchGlyph + $rowColor)
+                        }
                     }
 
                     # Right column formatting (preview lines are pre-styled ANSI, or empty)
