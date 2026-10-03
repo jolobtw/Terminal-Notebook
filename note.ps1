@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.2"
+$AppVersion = "2.6.3"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -225,14 +225,12 @@ function Register-ObsidianVault {
 
 function Render-HeaderBanner($width) {
     $sb = New-Object System.Text.StringBuilder
-    $starTitle = ".  *  +     TERMINAL NOTEBOOK v$AppVersion     +  *  ."
-    $starPad = " " * [Math]::Max(0, [int](($width - $starTitle.Length) / 2))
-    [void]$sb.AppendLine($starPad + (Render-GradientText $starTitle $gWaveDark $gWaveOrange))
+    $titleText = " T E R M I N A L   N O T E B O O K   v$AppVersion "
+    $pad = " " * [Math]::Max(0, [int](($width - $titleText.Length) / 2))
+    [void]$sb.AppendLine($pad + (Render-GradientText $titleText $gWaveOrange $gWaveAmber))
 
     $barWidth = [Math]::Max(10, $width - 2)
     [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2584)))
-    [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2588)))
-    [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2580)))
     return $sb.ToString().TrimEnd()
 }
 

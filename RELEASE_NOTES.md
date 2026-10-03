@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.3
+**Date:** 2026-10-02
+
+### UI Tweaks
+- **Sleeker Header Banner:** Redesigned the main "Terminal Notebook" title banner. The text has been spaced out for a cleaner, modern look, and its gradient now shifts brightly from Flame Orange to Radiant Amber so it stands out. The thick 3-line horizontal gradient bar beneath it has been shrunk to a single sleek accent line (using lower-half terminal blocks) to reduce visual clutter without losing the signature aesthetic.
+
 ## Version 2.6.2
 **Date:** 2026-10-02
 
