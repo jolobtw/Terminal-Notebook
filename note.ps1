@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.4"
+$AppVersion = "2.6.5"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -759,14 +759,27 @@ function Build-NotebookTreeItems {
             } 
         } -Descending
     }
+    # Add Spacer if we have both folders and root notes
+    if ($Level -eq 0 -and $subDirs.Count -gt 0 -and $rawFiles.Count -gt 0) {
+        $items += [PSCustomObject]@{
+            Type = "Spacer"
+            Name = ""
+            FullName = ""
+            Level = 0
+            IsExpanded = $false
+            ItemCount = 0
+        }
+    }
+
     foreach ($f in $files) {
         $noteItem = [PSCustomObject]@{
-            Type        = "Note"
-            Name        = (Format-NoteTitle $f)
-            FileName    = $f.Name
-            FullName    = $f.FullName
-            FileInfo    = $f
-            Level       = $Level
+            Type          = "Note"
+            Name          = (Format-NoteTitle $f)
+            FileName      = $f.Name
+            FullName      = $f.FullName
+            FileInfo      = $f
+            Level         = $Level
+            IsLastSibling = ($f.FullName -eq $files[-1].FullName)
         }
         $items += $noteItem
     }
@@ -1521,7 +1534,10 @@ function Start-NotebookBrowser {
             $isFolderRow = $false
             if ($itemIdx -lt $treeItems.Count) {
                 $cur = $treeItems[$itemIdx]
-                if ($cur.Type -eq "Folder") {
+                if ($cur.Type -eq "Spacer") {
+                    $leftStr = ""
+                    $isRowSelected = $false # Spacers cannot be selected
+                } elseif ($cur.Type -eq "Folder") {
                     $isFolderRow = $true
                     $indent = "  " * $cur.Level
                     $arrow = if ($cur.IsExpanded) { "$gArrowDown " } else { "$gArrowRight " }
@@ -1531,9 +1547,15 @@ function Start-NotebookBrowser {
                     $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
                     $leftStr = "$indent$arrow$icon$dispName$countLabel"
                 } else {
-                    $indent = "  " * ($cur.Level + 1)
-                    $icon = "$gFileIcon "
-                    $maxNameLen = $leftWidth - $indent.Length - 5
+                    $indent = "  " * $cur.Level
+                    $branch = if ($cur.Level -gt 0) {
+                        if ($cur.IsLastSibling) { ([string][char]0x2514 + [string][char]0x2500 + " ") }
+                        else { ([string][char]0x251C + [string][char]0x2500 + " ") }
+                    } else {
+                        "  "
+                    }
+                    $icon = "$branch$gFileIcon "
+                    $maxNameLen = $leftWidth - $indent.Length - 6
                     $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
                     $leftStr = "$indent$icon$dispName"
                 }

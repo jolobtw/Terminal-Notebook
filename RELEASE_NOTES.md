@@ -1,5 +1,12 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.5
+**Date:** 2026-10-02
+
+### UI Tweaks
+- **File Tree Connectors:** Re-engineered the Notebook Browser rendering logic to dynamically draw structural tree connecting branches (`├─` and `└─`) for notes inside folders, significantly improving visual hierarchy and making it much easier to distinguish between root-level notes and nested notes.
+- **Root Spacing:** The UI now intelligently inserts a blank "Spacer" item between the bottom of your folders and the beginning of your root-level notes, creating a clean visual break.
+
 ## Version 2.6.4
 **Date:** 2026-10-02
 
