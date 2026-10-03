@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 2.9.4
+**Date:** 2026-10-03
+
+### Features & UI Polish
+- **Fullscreen Reader Outer App Border:** Upgraded the distraction-free Fullscreen Reader (`[V]`) to feature the identical full-width boxed container, rounded corners (`╭`, `╮`, `╰`, `╯`), inner padding margins, and top-to-bottom Gray-to-Orange vertical gradient present in the main TUI Browser.
+
 ## Version 2.9.3
 **Date:** 2026-10-03
 

@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "2.9.3"
+$AppVersion = "2.9.4"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1484,7 +1484,7 @@ function View-FullscreenNote {
                        $cOrange + "[P]" + $cSilver + " Append  "
     }
     $footerKeys += $cOrange + "[Q/Esc]" + $cSilver + " Return..."
-    $modeTag = if ($ReadOnly) { $cGray + " [Read-Only]" } else { "" }
+    $modeTag = if ($ReadOnly) { " [Read-Only]" } else { "" }
 
     while ($true) {
         $termWidth = 99
@@ -1494,38 +1494,69 @@ function View-FullscreenNote {
             if ([Console]::WindowHeight -gt 15) { $termHeight = [Console]::WindowHeight }
         } catch {}
 
+        # Reserved rows: Banner (2) + spacing (1) + Box Header (1) + Box Footer (1) + spacing (1) + Nav Legend (1) = 7 rows
+        $boxHeight = [Math]::Max(5, $termHeight - 7)
+        $viewHeight = [Math]::Max(1, $boxHeight - 2)
+
         # Re-wrap the document whenever the terminal width changes
         if ($termWidth -ne $renderWidth) {
-            $termW = [Math]::Max(20, $termWidth - 2)
-            $borderLine = $cDarkGray + ("=" * [Math]::Min(120, $termW)) + $rst
-            $textWidth = [Math]::Max(30, $termW - 2)
+            $textWidth = [Math]::Max(20, $termWidth - 4)
             $renderedLines = @(Convert-MarkdownToTerminalLines -RawLines $rawLines -Width $textWidth)
             $renderWidth = $termWidth
             $needsClear = $true
         }
 
-        $viewHeight = [Math]::Max(5, $termHeight - 13)
         $maxScroll = [Math]::Max(0, $renderedLines.Count - $viewHeight)
         if ($scrollOffset -gt $maxScroll) { $scrollOffset = $maxScroll }
         $visEnd = [Math]::Min($renderedLines.Count, $scrollOffset + $viewHeight)
 
         # Assemble the whole frame in memory, then write it in one go (no flicker)
         $sb = [System.Text.StringBuilder]::new()
-        [void]$sb.Append((Render-HeaderBanner $termWidth)).Append("`r`n`r`n")
-        [void]$sb.Append($borderLine + "`r`n")
-        [void]$sb.Append($cOrange + " Fullscreen Reader: " + $rst + $cWhite + (Truncate-String $File.Name ($termWidth - 35)) + $modeTag + $rst + "`r`n")
-        [void]$sb.Append(" Path: " + $cGray + (Truncate-String $File.FullName ($termWidth - 8)) + $rst + "`r`n")
-        [void]$sb.Append($borderLine + "`r`n`r`n")
+        [void]$sb.AppendLine((Render-HeaderBanner $termWidth))
 
-        for ($i = 0; $i -lt $viewHeight; $i++) {
-            $idx = $scrollOffset + $i
-            if ($idx -lt $visEnd) { [void]$sb.Append((Limit-AnsiText $renderedLines[$idx] ($termWidth - 1)) + $rst) }
-            [void]$sb.Append("`r`n")
+        # Outer Box Gradient Colors (Slate Gray -> Vivid Flame Orange)
+        $cBorderStart = @(95, 100, 115)
+        $cBorderEnd   = @(255, 130, 0)
+        $topBorderColor = fg $cBorderStart[0] $cBorderStart[1] $cBorderStart[2]
+        $botBorderColor = fg $cBorderEnd[0] $cBorderEnd[1] $cBorderEnd[2]
+
+        $leftTitle = " FULLSCREEN READER: " + (Truncate-String $File.Name 40) + $modeTag
+        $scrollNotice = ""
+        if ($renderedLines.Count -gt $viewHeight) {
+            $scrollNotice = " [$($scrollOffset + 1)-$visEnd of $($renderedLines.Count)] "
         }
 
-        [void]$sb.Append("`r`n" + $borderLine + "`r`n")
-        $scrollNotice = if ($renderedLines.Count -gt $viewHeight) { $cGray + "  [$($scrollOffset + 1)-$visEnd of $($renderedLines.Count)] " } else { "" }
-        [void]$sb.Append(" " + $footerKeys + $scrollNotice + $rst + "$esc[J")
+        $availWidth = $termWidth - 2
+        if ($leftTitle.Length + $scrollNotice.Length -gt $availWidth - 2) {
+            $maxTitleLen = [Math]::Max(10, $availWidth - $scrollNotice.Length - 4)
+            $leftTitle = Truncate-String -Str $leftTitle -MaxLen $maxTitleLen
+        }
+        $headerDashes = [Math]::Max(0, $availWidth - $leftTitle.Length - $scrollNotice.Length)
+
+        [void]$sb.Append($topBorderColor + $uRoundTL + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $headerDashes) + $cAmber + $scrollNotice + $topBorderColor + $uRoundTR + $rst + "`r`n")
+
+        for ($r = 0; $r -lt $boxHeight; $r++) {
+            $tRatio = ($r + 1) / ($boxHeight + 1.0)
+            $rowRgb = Get-GradientColor $cBorderStart $cBorderEnd $tRatio
+            $vBar = (fg $rowRgb[0] $rowRgb[1] $rowRgb[2]) + $bVert + $rst
+
+            if ($r -eq 0 -or $r -eq ($boxHeight - 1)) {
+                # Top & bottom padding rows inside box for visual breathing room
+                [void]$sb.Append($vBar).Append(" " * ($termWidth - 2)).Append($vBar + "`r`n")
+                continue
+            }
+
+            $idx = $scrollOffset + ($r - 1)
+            $pLine = if ($idx -lt $renderedLines.Count) { $renderedLines[$idx] } else { "" }
+            $cellStr = Format-AnsiCell $pLine ($termWidth - 4)
+            [void]$sb.Append($vBar).Append(" ").Append($cellStr).Append(" ").Append($vBar + "`r`n")
+        }
+
+        # Box Footer Line
+        [void]$sb.AppendLine($botBorderColor + $uRoundBL + ($bHoriz * ($termWidth - 2)) + $uRoundBR + $rst)
+
+        # Nav Legend
+        [void]$sb.Append(" " + $footerKeys + $rst + "$esc[J")
 
         if ($needsClear) {
             Clear-Host
