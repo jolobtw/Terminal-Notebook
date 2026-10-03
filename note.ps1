@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.7"
+$AppVersion = "2.6.8"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1391,7 +1391,7 @@ function Start-NotebookBrowser {
                 } else {
                     $previewLines += ("    " + $cOrange + "[W/S] " + $cSilver + "Move  " + $cOrange + "[A/D] " + $cSilver + "Folders  " + $cOrange + "[R] " + $cSilver + "Rename  " + $cOrange + "[X] " + $cSilver + "Delete" + $rst)
                 }
-            } else {
+            } elseif ($activeItem.Type -eq "Note") {
                 # Note
                 $currentRightTitle = $activeItem.FileName
                 if (Test-Path $activeItem.FullName) {

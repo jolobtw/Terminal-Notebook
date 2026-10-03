@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.8
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Spacer Navigation Crash:** Fixed an unhandled exception where navigating down onto the visual "Spacer" element in the tree view caused the right-hand Preview Pane to attempt to render a file with an empty path, crashing the UI loop. The preview pane now correctly yields a blank view when resting on the Spacer.
+
 ## Version 2.6.7
 **Date:** 2026-10-02
 
