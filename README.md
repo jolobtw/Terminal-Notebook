@@ -10,6 +10,7 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 ### 🖥️ Immersive Terminal UI
 * **Notebook Browser:** An interactive, zero-flicker TUI (Text User Interface) that reacts instantly to keystrokes.
 * **Sleek Aesthetics:** Features rounded outer app borders, top-to-bottom Slate Gray to Flame Orange vertical gradients, subtle Dark Gray tree connectors (`├─`, `└─`), and intelligent layout spacing for a clean, modern look.
+* **Inline Floating Modals:** Actions like creating folders (`F`), creating notes (`N`), logging quick thoughts (`L`), renaming (`R`), and deleting (`X`) open floating popup cards overlaid directly onto the TUI background.
 * **Frictionless Navigation:** Use `W/A/S/D` or Arrow Keys to fluidly navigate your folder hierarchy. The layout engine intelligently bypasses visual spacers to save you keystrokes.
 * **Dynamic Reflow:** The interface dynamically resizes to perfectly fill your terminal window without artifacting or line-wrapping destruction.
 

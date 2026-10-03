@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "2.9.4"
+$AppVersion = "3.0.0"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -378,6 +378,217 @@ function Write-ModalHeader {
         Write-Host $rule -ForegroundColor DarkGray
         Write-Host ($cOrange + $pad + $Title + $rst)
         Write-Host $rule -ForegroundColor DarkGray
+    }
+}
+
+# --- Inline Floating Popup Modal Engine ---
+function Get-AnsiTail([string]$Text, [int]$StartCol, [int]$TotalWidth) {
+    if ([string]::IsNullOrEmpty($Text)) { return "" }
+    $sb = [System.Text.StringBuilder]::new()
+    $visible = 0
+    $i = 0
+    while ($i -lt $Text.Length) {
+        $m = $AnsiTokenRegex.Match($Text, $i)
+        if ($m.Success) {
+            if ($visible -ge $StartCol) { [void]$sb.Append($m.Value) }
+            $i += $m.Length
+        } else {
+            if ($visible -ge $StartCol -and $visible -lt $TotalWidth) {
+                [void]$sb.Append($Text[$i])
+            }
+            $visible++
+            $i++
+        }
+    }
+    return $sb.ToString()
+}
+
+function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
+    $mh = $ModalLines.Count
+    $mw = $AnsiRegex.Replace($ModalLines[0], '').Length
+    $topRow = [Math]::Max(2, [int](($FrameLines.Count - $mh) / 2))
+    $leftCol = [Math]::Max(1, [int](($TermWidth - $mw) / 2))
+
+    $outLines = [System.Collections.Generic.List[string]]::new()
+
+    for ($i = 0; $i -lt $FrameLines.Count; $i++) {
+        if ($i -ge $topRow -and ($i - $topRow) -lt $mh) {
+            $mIdx = $i - $topRow
+            $leftBg = Limit-AnsiText $FrameLines[$i] $leftCol
+            $modalStr = $ModalLines[$mIdx]
+            $rightCol = $leftCol + $mw
+            $rightBg = Get-AnsiTail $FrameLines[$i] $rightCol $TermWidth
+            $outLines.Add($leftBg + $modalStr + $rightBg)
+        } else {
+            $outLines.Add($FrameLines[$i])
+        }
+    }
+    return $outLines
+}
+
+function Show-InlineInputModal {
+    param(
+        [string]$Title,
+        [string]$Subtitle = "",
+        [string]$PromptLabel = "Name:",
+        [string]$InitialValue = "",
+        [string]$ConfirmActionLabel = "Submit",
+        [scriptblock]$RenderBgBlock
+    )
+
+    $inputVal = $InitialValue
+
+    Set-CursorVisible $false
+
+    while ($true) {
+        $bgLines = & $RenderBgBlock
+        $termW = 99
+        try { if ([Console]::WindowWidth -gt 20) { $termW = [Console]::WindowWidth - 1 } } catch {}
+
+        $cardW = [Math]::Min(60, [Math]::Max(44, $termW - 10))
+        $innerW = $cardW - 8
+
+        $subDisp = Truncate-String -Str $Subtitle -MaxLen ($cardW - 4)
+
+        $dispInput = $inputVal
+        if ($dispInput.Length -gt ($innerW - 2)) {
+            $dispInput = "..." + $dispInput.Substring($dispInput.Length - ($innerW - 5))
+        }
+
+        $headerTitle = " $Title "
+        $dashRight = [Math]::Max(2, $cardW - 3 - $headerTitle.Length)
+        $topBorderColor = fg 95 100 115
+        $botBorderColor = fg 255 130 0
+        $cardVBar = fg 255 140 30 + $bVert + $rst
+
+        $modalLines = [System.Collections.Generic.List[string]]::new()
+        $modalLines.Add($topBorderColor + $uRoundTL + $bHoriz + $cOrange + $headerTitle + $topBorderColor + ($bHoriz * $dashRight) + $uRoundTR + $rst)
+
+        if ($subDisp) {
+            $subPad = " " * [Math]::Max(0, $cardW - 4 - $subDisp.Length)
+            $modalLines.Add($cardVBar + " " + $cGray + $subDisp + $subPad + " " + $cardVBar)
+        } else {
+            $modalLines.Add($cardVBar + (" " * ($cardW - 2)) + $cardVBar)
+        }
+
+        $lblDisp = Truncate-String -Str $PromptLabel -MaxLen ($cardW - 4)
+        $lblPad = " " * [Math]::Max(0, $cardW - 4 - $lblDisp.Length)
+        $modalLines.Add($cardVBar + " " + $cWhite + $sBold + $lblDisp + $sNoBold + $lblPad + " " + $cardVBar)
+
+        $modalLines.Add($cardVBar + "   " + $cDarkGray + $uRoundTL + ($bHoriz * $innerW) + $uRoundTR + $cDarkGray + "   " + $cardVBar)
+
+        $inputText = $dispInput + "$cOrange_$rst"
+        $inputVisibleLen = $dispInput.Length + 1
+        $inputPad = " " * [Math]::Max(0, $innerW - $inputVisibleLen)
+        $modalLines.Add($cardVBar + "   " + $cDarkGray + $bVert + " " + $cWhite + $inputText + $inputPad + $cDarkGray + " " + $bVert + "   " + $cardVBar)
+
+        $modalLines.Add($cardVBar + "   " + $cDarkGray + $uRoundBL + ($bHoriz * $innerW) + $uRoundBR + $cDarkGray + "   " + $cardVBar)
+
+        $modalLines.Add($cardVBar + (" " * ($cardW - 2)) + $cardVBar)
+
+        $footerKeys = "$cAmber[Enter]$cSilver $ConfirmActionLabel   $cAmber[Esc]$cSilver Cancel"
+        $footerVisibleLen = 8 + $ConfirmActionLabel.Length + 11
+        $footDashRight = [Math]::Max(2, $cardW - 5 - $footerVisibleLen)
+        $modalLines.Add($botBorderColor + $uRoundBL + ($bHoriz * 2) + " " + $footerKeys + " " + $botBorderColor + ($bHoriz * $footDashRight) + $uRoundBR + $rst)
+
+        $compositeFrame = Overlay-ModalOnFrame -FrameLines $bgLines -ModalLines $modalLines -TermWidth $termW
+
+        $sb = [System.Text.StringBuilder]::new()
+        foreach ($line in $compositeFrame) {
+            [void]$sb.AppendLine($line)
+        }
+        try { [Console]::SetCursorPosition(0, 0) } catch {}
+        [Console]::Write("$esc[H")
+        [Console]::Write($sb.ToString().Replace("`r`n", "$esc[K`r`n") + "$esc[K$esc[J")
+
+        try { $k = Read-KeyOrResize } catch { return $null }
+        if ($null -eq $k) { continue }
+
+        switch ($k.Key) {
+            "Enter" {
+                return $inputVal.Trim()
+            }
+            "Escape" {
+                return $null
+            }
+            "Backspace" {
+                if ($inputVal.Length -gt 0) {
+                    $inputVal = $inputVal.Substring(0, $inputVal.Length - 1)
+                }
+            }
+            default {
+                $char = $k.KeyChar
+                if (-not [char]::IsControl($char) -and [int]$char -ne 0) {
+                    $inputVal += $char
+                }
+            }
+        }
+    }
+}
+
+function Show-InlineConfirmModal {
+    param(
+        [string]$Title = "CONFIRM ACTION",
+        [string]$Message,
+        [string]$SubMessage = "",
+        [string]$ConfirmLabel = "Delete",
+        [scriptblock]$RenderBgBlock
+    )
+
+    Set-CursorVisible $false
+
+    while ($true) {
+        $bgLines = & $RenderBgBlock
+        $termW = 99
+        try { if ([Console]::WindowWidth -gt 20) { $termW = [Console]::WindowWidth - 1 } } catch {}
+
+        $cardW = [Math]::Min(60, [Math]::Max(44, $termW - 10))
+        $msgDisp = Truncate-String -Str $Message -MaxLen ($cardW - 4)
+        $subDisp = Truncate-String -Str $SubMessage -MaxLen ($cardW - 4)
+
+        $headerTitle = " $Title "
+        $dashRight = [Math]::Max(2, $cardW - 3 - $headerTitle.Length)
+        $topBorderColor = fg 255 80 80
+        $botBorderColor = fg 255 100 30
+        $cardVBar = fg 255 100 30 + $bVert + $rst
+
+        $modalLines = [System.Collections.Generic.List[string]]::new()
+        $modalLines.Add($topBorderColor + $uRoundTL + $bHoriz + $cWarn + $headerTitle + $topBorderColor + ($bHoriz * $dashRight) + $uRoundTR + $rst)
+
+        $modalLines.Add($cardVBar + (" " * ($cardW - 2)) + $cardVBar)
+
+        $msgPad = " " * [Math]::Max(0, $cardW - 4 - $msgDisp.Length)
+        $modalLines.Add($cardVBar + " " + $cWhite + $sBold + $msgDisp + $sNoBold + $msgPad + " " + $cardVBar)
+
+        if ($subDisp) {
+            $subPad = " " * [Math]::Max(0, $cardW - 4 - $subDisp.Length)
+            $modalLines.Add($cardVBar + " " + $cWarn + $subDisp + $subPad + " " + $cardVBar)
+        } else {
+            $modalLines.Add($cardVBar + (" " * ($cardW - 2)) + $cardVBar)
+        }
+
+        $modalLines.Add($cardVBar + (" " * ($cardW - 2)) + $cardVBar)
+
+        $footerKeys = "$cWarn[Y]$cSilver $ConfirmLabel   $cAmber[Esc/N]$cSilver Cancel"
+        $footerVisibleLen = 4 + $ConfirmLabel.Length + 15
+        $footDashRight = [Math]::Max(2, $cardW - 5 - $footerVisibleLen)
+        $modalLines.Add($botBorderColor + $uRoundBL + ($bHoriz * 2) + " " + $footerKeys + " " + $botBorderColor + ($bHoriz * $footDashRight) + $uRoundBR + $rst)
+
+        $compositeFrame = Overlay-ModalOnFrame -FrameLines $bgLines -ModalLines $modalLines -TermWidth $termW
+
+        $sb = [System.Text.StringBuilder]::new()
+        foreach ($line in $compositeFrame) {
+            [void]$sb.AppendLine($line)
+        }
+        try { [Console]::SetCursorPosition(0, 0) } catch {}
+        [Console]::Write("$esc[H")
+        [Console]::Write($sb.ToString().Replace("`r`n", "$esc[K`r`n") + "$esc[K$esc[J")
+
+        try { $k = Read-KeyOrResize } catch { return $false }
+        if ($null -eq $k) { continue }
+
+        if ($k.Key -eq "Y") { return $true }
+        if ($k.Key -in @("N", "Escape", "Q")) { return $false }
     }
 }
 
@@ -1209,22 +1420,41 @@ function Write-InvalidNameMessage {
 
 # --- Folder Creation Prompt ---
 function New-FolderPrompt {
-    param([string]$ParentDir = "")
+    param(
+        [string]$ParentDir = "",
+        [scriptblock]$RenderBgBlock = $null
+    )
 
     $script:LastActionPath = $null
     $targetParent = $NotesDir
-    $skipPrompt = $false
 
     if (-not [string]::IsNullOrWhiteSpace($ParentDir) -and (Test-Path -LiteralPath $ParentDir)) {
         $targetParent = $ParentDir
-        $skipPrompt = $true
+    }
+
+    if ($RenderBgBlock) {
+        $relPath = Get-RelativeNotePath $targetParent
+        $sub = if ($relPath) { "Location: ~/Notes/$relPath" } else { "Location: ~/Notes" }
+        $folderName = Show-InlineInputModal -Title "CREATE NEW FOLDER" -Subtitle $sub -PromptLabel "Folder Name:" -ConfirmActionLabel "Create" -RenderBgBlock $RenderBgBlock
+
+        if ([string]::IsNullOrWhiteSpace($folderName)) { return }
+
+        $safeName = ConvertTo-Slug $folderName
+        if (-not $safeName) { return }
+        $newFolderPath = Join-Path $targetParent $safeName
+
+        if (Test-Path -LiteralPath $newFolderPath) { return }
+
+        [void][System.IO.Directory]::CreateDirectory($newFolderPath)
+        $script:LastActionPath = $newFolderPath
+        return
     }
 
     Write-ModalHeader "CREATE NEW FOLDER"
     Write-Host " Parent: ~/Notes/$(Get-RelativeNotePath $targetParent)" -ForegroundColor Gray
     Write-Host " Tip: Press Enter without a name or 'c' to cancel`n" -ForegroundColor DarkGray
 
-    if (-not $skipPrompt) {
+    if ([string]::IsNullOrWhiteSpace($ParentDir)) {
         $targetParent = Select-NotesFolder "Where would you like to create this folder?"
     }
 
@@ -1255,12 +1485,37 @@ function New-FolderPrompt {
 
 # --- Rename Prompt (Folder or Note) ---
 function Rename-ItemPrompt {
-    param($Item)
+    param(
+        $Item,
+        [scriptblock]$RenderBgBlock = $null
+    )
     if (-not $Item -or -not (Test-Path -LiteralPath $Item.FullName)) { return }
 
     $script:LastActionPath = $null
     $isFolder = $Item.Type -eq "Folder"
     $noun = if ($isFolder) { "folder" } else { "note" }
+
+    if ($RenderBgBlock) {
+        $initName = if ($isFolder) { $Item.Name } else { $Item.BaseName }
+        $newName = Show-InlineInputModal -Title "RENAME ITEM" -Subtitle "Current: $($Item.Name)" -PromptLabel "New Name:" -InitialValue $initName -ConfirmActionLabel "Rename" -RenderBgBlock $RenderBgBlock
+
+        if ([string]::IsNullOrWhiteSpace($newName)) { return }
+
+        $safeName = if ($isFolder) { ConvertTo-Slug $newName } else { ConvertTo-Slug $newName -Lower }
+        if (-not $safeName) { return }
+        if (-not $isFolder) { $safeName += ".md" }
+
+        $newPath = Join-Path (Split-Path $Item.FullName -Parent) $safeName
+        if (Test-Path -LiteralPath $newPath) { return }
+
+        Rename-Item -LiteralPath $Item.FullName -NewName $safeName
+        if ($isFolder -and $script:CollapsedFolders.ContainsKey($Item.FullName)) {
+            $script:CollapsedFolders.Remove($Item.FullName)
+            $script:CollapsedFolders[$newPath] = $true
+        }
+        $script:LastActionPath = $newPath
+        return
+    }
 
     Write-ModalHeader "RENAME" -Color Cyan
     Write-Host " Current: $($Item.Name)`n" -ForegroundColor Yellow
@@ -1297,8 +1552,27 @@ function Rename-ItemPrompt {
 
 # --- Delete Prompt (Folder or Note) ---
 function Delete-ItemPrompt {
-    param($Item)
+    param(
+        $Item,
+        [scriptblock]$RenderBgBlock = $null
+    )
     if (-not $Item -or -not (Test-Path -LiteralPath $Item.FullName)) { return }
+
+    if ($RenderBgBlock) {
+        $warnSub = ""
+        if ($Item.Type -eq "Folder") {
+            $childCount = @(Get-ChildItem -LiteralPath $Item.FullName -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue).Count
+            if ($childCount -gt 0) { $warnSub = "[!] WARNING: Contains $childCount note(s)!" }
+        }
+
+        $confirmed = Show-InlineConfirmModal -Title "DELETE ITEM" -Message "Delete $($Item.Type.ToLower()) '$($Item.Name)'?" -SubMessage $warnSub -ConfirmLabel "Delete" -RenderBgBlock $RenderBgBlock
+
+        if ($confirmed) {
+            Remove-Item -LiteralPath $Item.FullName -Recurse -Force
+            $script:CollapsedFolders.Remove($Item.FullName)
+        }
+        return
+    }
 
     Write-ModalHeader "DELETE ITEM" -Color Red
     Write-Host ""
@@ -1334,7 +1608,8 @@ function Delete-ItemPrompt {
 function New-InteractiveNote {
     param(
         [string]$InitialTitle = "",
-        [string]$DestinationDir = ""
+        [string]$DestinationDir = "",
+        [scriptblock]$RenderBgBlock = $null
     )
 
     $script:LastActionPath = $null
@@ -1345,28 +1620,32 @@ function New-InteractiveNote {
         $skipFolderPrompt = $true
     }
 
-    Write-ModalHeader "CREATE A NEW NOTE"
-    Write-Host " Folder: ~/Notes/$(Get-RelativeNotePath $targetDir)" -ForegroundColor Gray
-    Write-Host " Tip: Press Enter with an empty title or type 'c' to cancel`n" -ForegroundColor DarkGray
-
     $title = $InitialTitle
-    if ([string]::IsNullOrWhiteSpace($title)) {
-        Write-Host "Enter Note Title: " -ForegroundColor White -NoNewline
-        $title = Read-Host
+    if ([string]::IsNullOrWhiteSpace($title) -and $RenderBgBlock) {
+        $relPath = Get-RelativeNotePath $targetDir
+        $sub = if ($relPath) { "Location: ~/Notes/$relPath" } else { "Location: ~/Notes" }
+        $title = Show-InlineInputModal -Title "CREATE NEW NOTE" -Subtitle $sub -PromptLabel "Note Title:" -ConfirmActionLabel "Create & Edit" -RenderBgBlock $RenderBgBlock
     }
 
-    if (Test-CancelInput $title) {
-        Write-Host "Note creation cancelled." -ForegroundColor DarkYellow
-        Start-Sleep -Milliseconds 600
-        return
+    if ([string]::IsNullOrWhiteSpace($title)) {
+        if (-not $RenderBgBlock) {
+            Write-ModalHeader "CREATE A NEW NOTE"
+            Write-Host " Folder: ~/Notes/$(Get-RelativeNotePath $targetDir)" -ForegroundColor Gray
+            Write-Host " Tip: Press Enter with an empty title or type 'c' to cancel`n" -ForegroundColor DarkGray
+
+            Write-Host "Enter Note Title: " -ForegroundColor White -NoNewline
+            $title = Read-Host
+        }
     }
+
+    if (Test-CancelInput $title) { return }
 
     $title = $title.Trim()
     $safeTitle = ConvertTo-Slug $title -Lower
-    if (-not $safeTitle) { Write-InvalidNameMessage; return }
+    if (-not $safeTitle) { if (-not $RenderBgBlock) { Write-InvalidNameMessage }; return }
 
     # Only ask for destination folder if not already predetermined/contextual
-    if (-not $skipFolderPrompt) {
+    if (-not $skipFolderPrompt -and -not $RenderBgBlock) {
         $targetDir = Select-NotesFolder "`nWhere would you like to save this note?"
     }
 
@@ -1390,26 +1669,29 @@ function New-InteractiveNote {
     $ed = Get-PreferredTerminalEditor
     if ($ed) {
         Invoke-TerminalEditor -EditorPath $ed -FilePath $filePath -GoToEnd
-        Write-Host "Saved note: $fileName" -ForegroundColor Green
     } else {
         Open-InObsidian -File (Get-Item -LiteralPath $filePath)
-        Write-Host "Created note in Obsidian: $fileName" -ForegroundColor Green
     }
-    Start-Sleep -Milliseconds 700
 }
 
 function Quick-Log {
-    param([string]$Text)
+    param(
+        [string]$Text,
+        [scriptblock]$RenderBgBlock = $null
+    )
 
-    if ([string]::IsNullOrWhiteSpace($Text)) {
+    if ([string]::IsNullOrWhiteSpace($Text) -and $RenderBgBlock) {
+        $today = (Get-Date).ToString("yyyy-MM-dd")
+        $fileName = "$today-quick-log.md"
+        $Text = Show-InlineInputModal -Title "QUICK DAILY LOG" -Subtitle "Log File: $fileName" -PromptLabel "Quick Thought:" -ConfirmActionLabel "Save Log" -RenderBgBlock $RenderBgBlock
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Text) -and -not $RenderBgBlock) {
         Write-Host "`nEnter quick thought (or press Enter to cancel): " -ForegroundColor Yellow -NoNewline
         $Text = Read-Host
     }
-    if (Test-CancelInput $Text) {
-        Write-Host "Cancelled." -ForegroundColor DarkYellow
-        Start-Sleep -Milliseconds 500
-        return
-    }
+
+    if (Test-CancelInput $Text) { return }
 
     $today = (Get-Date).ToString("yyyy-MM-dd")
     $fileName = "$today-quick-log.md"
@@ -1422,8 +1704,11 @@ function Quick-Log {
 
     $time = (Get-Date).ToString("HH:mm")
     Write-Utf8File -Path $filePath -Text ("- **[$time]** $Text" + $nl) -Append
-    Write-Host "Added to: $fileName" -ForegroundColor Green
-    Start-Sleep -Milliseconds 800
+    $script:LastActionPath = $filePath
+    if (-not $RenderBgBlock) {
+        Write-Host "Added to: $fileName" -ForegroundColor Green
+        Start-Sleep -Milliseconds 800
+    }
 }
 
 function Append-ToNote {
@@ -1837,115 +2122,127 @@ function Start-NotebookBrowser {
             }
 
             # Assemble Frame in Memory (Flicker-Free Double-Buffering)
-            $sb = [System.Text.StringBuilder]::new()
+            $renderFrameLines = {
+                $sb = [System.Text.StringBuilder]::new()
 
-            # 1. Header Banner (Graphite to Flame Orange Horizon)
-            [void]$sb.AppendLine((Render-HeaderBanner $termWidth))
+                # 1. Header Banner (Graphite to Flame Orange Horizon)
+                [void]$sb.AppendLine((Render-HeaderBanner $termWidth))
 
-            # 2. Box Header (100% Aligned Math)
-            $activeNbName = Get-ActiveNotebookName
-            $leftTitle = " WORKSPACE: $activeNbName "
-            $sortIcon = if ($script:SortMode -eq "alpha") { $gSortAlpha } else { $gSortDate }
-            $sortText = if ($script:SortMode -eq "alpha") { "A-Z" } else { "Date" }
-            $sortBadge = " $sortIcon $sortText "
+                # 2. Box Header (100% Aligned Math)
+                $activeNbName = Get-ActiveNotebookName
+                $leftTitle = " WORKSPACE: $activeNbName "
+                $sortIcon = if ($script:SortMode -eq "alpha") { $gSortAlpha } else { $gSortDate }
+                $sortText = if ($script:SortMode -eq "alpha") { "A-Z" } else { "Date" }
+                $sortBadge = " $sortIcon $sortText "
 
-            $availLeft = $leftWidth - 1
-            if ($leftTitle.Length + $sortBadge.Length -gt $availLeft) {
-                $maxT = $availLeft - $sortBadge.Length - 1
-                if ($maxT -gt 5) {
-                    $leftTitle = Truncate-String -Str $leftTitle -MaxLen $maxT
-                } else {
-                    $leftTitle = " NOTES "
-                }
-            }
-            $leftDashes = [Math]::Max(0, $availLeft - $leftTitle.Length - $sortBadge.Length)
-
-            $scrollNotice = ""
-            if ($previewLines.Count -gt $usableHeight) {
-                $visEnd = [Math]::Min($previewLines.Count, $previewScrollOffset + $usableHeight)
-                $scrollNotice = " [$($previewScrollOffset + 1)-$visEnd of $($previewLines.Count)] "
-            }
-
-            $rightTitle = " PREVIEW " + $scrollNotice
-            $rightDashes = $rightWidth - $rightTitle.Length - 1
-            if ($rightDashes -lt 0) {
-                $rightTitle = " PREVIEW "
-                $rightDashes = [Math]::Max(0, $rightWidth - $rightTitle.Length - 1)
-            }
-
-            # Outer Box Gradient Colors (Slate Graphite / Gray -> Vivid Flame Orange)
-            $cBorderStart = @(95, 100, 115)
-            $cBorderEnd   = @(255, 130, 0)
-            $topBorderColor = fg $cBorderStart[0] $cBorderStart[1] $cBorderStart[2]
-            $botBorderColor = fg $cBorderEnd[0] $cBorderEnd[1] $cBorderEnd[2]
-
-            [void]$sb.Append($topBorderColor + $uRoundTL + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $leftDashes) + $cAmber + $sortBadge + $topBorderColor + $bTopT + $bHoriz + $cOrange + $rightTitle + $topBorderColor + ($bHoriz * $rightDashes) + $uRoundTR + $rst + "`r`n")
-
-            # 3. Render Rows
-            for ($r = 0; $r -lt $boxHeight; $r++) {
-                $tRatio = ($r + 1) / ($boxHeight + 1.0)
-                $rowRgb = Get-GradientColor $cBorderStart $cBorderEnd $tRatio
-                $vBar = (fg $rowRgb[0] $rowRgb[1] $rowRgb[2]) + $bVert + $rst
-
-                if ($r -eq 0) {
-                    # Top padding row to give breathing room beneath headers
-                    $blankLeft = $vBar + (" " * $leftWidth) + $rst
-                    $blankRight = $vBar + (" " * $rightWidth) + $rst
-                    [void]$sb.Append($blankLeft).Append($blankRight).Append($vBar + "`r`n")
-                    continue
-                }
-
-                $itemIdx = $scrollOffset + ($r - 1)
-
-                # Left column formatting
-                $leftStr = ""
-                $rowColor = $cSilver
-                $branchGlyph = $null
-                if ($itemIdx -lt $treeItems.Count) {
-                    $cur = $treeItems[$itemIdx]
-                    $indent = "  " * $cur.Level
-                    if ($cur.Type -eq "Folder") {
-                        $rowColor = $cFolder
-                        $arrow = if ($cur.IsExpanded) { "$gArrowDown " } else { "$gArrowRight " }
-                        $icon = if ($cur.IsExpanded) { "$gFolderOpen " } else { "$gFolderClosed " }
-                        $countLabel = " ($($cur.ItemCount))"
-                        $dispName = Truncate-String -Str $cur.Name -MaxLen ($leftWidth - $indent.Length - 7 - $countLabel.Length)
-                        $leftStr = "$indent$arrow$icon$dispName$countLabel"
-                    } elseif ($cur.Type -eq "Note") {
-                        $branch = "  "
-                        if ($cur.Level -gt 0) {
-                            $branchGlyph = if ($cur.IsLastSibling) { $gBranchEnd } else { $gBranchMid }
-                            $branch = "$branchGlyph "
-                        }
-                        $dispName = Truncate-String -Str $cur.Name -MaxLen ($leftWidth - $indent.Length - 6)
-                        $leftStr = "$indent$branch$gFileIcon $dispName"
+                $availLeft = $leftWidth - 1
+                if ($leftTitle.Length + $sortBadge.Length -gt $availLeft) {
+                    $maxT = $availLeft - $sortBadge.Length - 1
+                    if ($maxT -gt 5) {
+                        $leftTitle = Truncate-String -Str $leftTitle -MaxLen $maxT
+                    } else {
+                        $leftTitle = " NOTES "
                     }
-                    # Spacers render blank and can never be highlighted
-                    if ($itemIdx -eq $selectedIndex -and $cur.Type -ne "Spacer") { $rowColor = $cSelected }
                 }
-                $leftStr = $leftStr.PadRight($leftWidth)
-                if ($leftStr.Length -gt $leftWidth) { $leftStr = $leftStr.Substring(0, $leftWidth) }
+                $leftDashes = [Math]::Max(0, $availLeft - $leftTitle.Length - $sortBadge.Length)
 
-                $coloredLeftStr = $rowColor + $leftStr + $rst
-                # Subtly color the tree branches DarkGray
-                if ($branchGlyph) {
-                    $coloredLeftStr = $coloredLeftStr.Replace($branchGlyph, $cDarkGray + $branchGlyph + $rowColor)
+                $scrollNotice = ""
+                if ($previewLines.Count -gt $usableHeight) {
+                    $visEnd = [Math]::Min($previewLines.Count, $previewScrollOffset + $usableHeight)
+                    $scrollNotice = " [$($previewScrollOffset + 1)-$visEnd of $($previewLines.Count)] "
                 }
 
-                # Right column formatting (preview lines are pre-styled ANSI, or empty)
-                $pIndex = $previewScrollOffset + ($r - 1)
-                $pLine = if ($pIndex -lt $previewLines.Count) { $previewLines[$pIndex] } else { "" }
-                $rightStr = Format-AnsiCell $pLine $rightWidth
+                $rightTitle = " PREVIEW " + $scrollNotice
+                $rightDashes = $rightWidth - $rightTitle.Length - 1
+                if ($rightDashes -lt 0) {
+                    $rightTitle = " PREVIEW "
+                    $rightDashes = [Math]::Max(0, $rightWidth - $rightTitle.Length - 1)
+                }
 
-                # Draw row into buffer
-                [void]$sb.Append($vBar).Append($coloredLeftStr).Append($vBar).Append($rightStr).Append($vBar + "`r`n")
+                # Outer Box Gradient Colors (Slate Graphite / Gray -> Vivid Flame Orange)
+                $cBorderStart = @(95, 100, 115)
+                $cBorderEnd   = @(255, 130, 0)
+                $topBorderColor = fg $cBorderStart[0] $cBorderStart[1] $cBorderStart[2]
+                $botBorderColor = fg $cBorderEnd[0] $cBorderEnd[1] $cBorderEnd[2]
+
+                [void]$sb.Append($topBorderColor + $uRoundTL + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $leftDashes) + $cAmber + $sortBadge + $topBorderColor + $bTopT + $bHoriz + $cOrange + $rightTitle + $topBorderColor + ($bHoriz * $rightDashes) + $uRoundTR + $rst + "`r`n")
+
+                # 3. Render Rows
+                for ($r = 0; $r -lt $boxHeight; $r++) {
+                    $tRatio = ($r + 1) / ($boxHeight + 1.0)
+                    $rowRgb = Get-GradientColor $cBorderStart $cBorderEnd $tRatio
+                    $vBar = (fg $rowRgb[0] $rowRgb[1] $rowRgb[2]) + $bVert + $rst
+
+                    if ($r -eq 0) {
+                        # Top padding row to give breathing room beneath headers
+                        $blankLeft = $vBar + (" " * $leftWidth) + $rst
+                        $blankRight = $vBar + (" " * $rightWidth) + $rst
+                        [void]$sb.Append($blankLeft).Append($blankRight).Append($vBar + "`r`n")
+                        continue
+                    }
+
+                    $itemIdx = $scrollOffset + ($r - 1)
+
+                    # Left column formatting
+                    $leftStr = ""
+                    $rowColor = $cSilver
+                    $branchGlyph = $null
+                    if ($itemIdx -lt $treeItems.Count) {
+                        $cur = $treeItems[$itemIdx]
+                        $indent = "  " * $cur.Level
+                        if ($cur.Type -eq "Folder") {
+                            $rowColor = $cFolder
+                            $arrow = if ($cur.IsExpanded) { "$gArrowDown " } else { "$gArrowRight " }
+                            $icon = if ($cur.IsExpanded) { "$gFolderOpen " } else { "$gFolderClosed " }
+                            $countLabel = " ($($cur.ItemCount))"
+                            $dispName = Truncate-String -Str $cur.Name -MaxLen ($leftWidth - $indent.Length - 7 - $countLabel.Length)
+                            $leftStr = "$indent$arrow$icon$dispName$countLabel"
+                        } elseif ($cur.Type -eq "Note") {
+                            $branch = "  "
+                            if ($cur.Level -gt 0) {
+                                $branchGlyph = if ($cur.IsLastSibling) { $gBranchEnd } else { $gBranchMid }
+                                $branch = "$branchGlyph "
+                            }
+                            $dispName = Truncate-String -Str $cur.Name -MaxLen ($leftWidth - $indent.Length - 6)
+                            $leftStr = "$indent$branch$gFileIcon $dispName"
+                        }
+                        # Spacers render blank and can never be highlighted
+                        if ($itemIdx -eq $selectedIndex -and $cur.Type -ne "Spacer") { $rowColor = $cSelected }
+                    }
+                    $leftStr = $leftStr.PadRight($leftWidth)
+                    if ($leftStr.Length -gt $leftWidth) { $leftStr = $leftStr.Substring(0, $leftWidth) }
+
+                    $coloredLeftStr = $rowColor + $leftStr + $rst
+                    # Subtly color the tree branches DarkGray
+                    if ($branchGlyph) {
+                        $coloredLeftStr = $coloredLeftStr.Replace($branchGlyph, $cDarkGray + $branchGlyph + $rowColor)
+                    }
+
+                    # Right column formatting (preview lines are pre-styled ANSI, or empty)
+                    $pIndex = $previewScrollOffset + ($r - 1)
+                    $pLine = if ($pIndex -lt $previewLines.Count) { $previewLines[$pIndex] } else { "" }
+                    $rightStr = Format-AnsiCell $pLine $rightWidth
+
+                    # Draw row into buffer
+                    [void]$sb.Append($vBar).Append($coloredLeftStr).Append($vBar).Append($rightStr).Append($vBar + "`r`n")
+                }
+
+                # 4. Box Footer
+                [void]$sb.AppendLine($botBorderColor + $uRoundBL + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $rightWidth) + $uRoundBR + $rst)
+
+                # 5. Navigation Bar
+                [void]$sb.Append($navBar)
+
+                $linesList = [System.Collections.Generic.List[string]]::new()
+                foreach ($l in ($sb.ToString() -split "`r`n")) {
+                    $linesList.Add($l)
+                }
+                return $linesList
             }
 
-            # 4. Box Footer
-            [void]$sb.AppendLine($botBorderColor + $uRoundBL + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $rightWidth) + $uRoundBR + $rst)
-
-            # 5. Navigation Bar
-            [void]$sb.Append($navBar)
+            $bgLines = & $renderFrameLines
+            $sb = [System.Text.StringBuilder]::new()
+            foreach ($line in $bgLines) { [void]$sb.AppendLine($line) }
 
             # 6. Atomic Write to Terminal (Zero-Flicker)
             if ($ui.NeedsFullClear) {
@@ -2102,25 +2399,35 @@ function Start-NotebookBrowser {
                 "N" {
                     $targetFolder = Get-ContextFolder $activeItem
                     $script:CollapsedFolders.Remove($targetFolder)
-                    Invoke-Modal { New-InteractiveNote -DestinationDir $targetFolder }
+                    New-InteractiveNote -DestinationDir $targetFolder -RenderBgBlock $renderFrameLines
+                    $ui.NeedsFullClear = $true
+                    $ui.IndexDirty = $true
                 }
                 "F" {
                     $targetParent = Get-ContextFolder $activeItem
                     $script:CollapsedFolders.Remove($targetParent)
-                    Invoke-Modal { New-FolderPrompt -ParentDir $targetParent }
+                    New-FolderPrompt -ParentDir $targetParent -RenderBgBlock $renderFrameLines
+                    $ui.NeedsFullClear = $true
+                    $ui.IndexDirty = $true
                 }
                 "R" {
                     if ($activeItem -and $activeItem.Type -ne "Spacer") {
-                        Invoke-Modal { Rename-ItemPrompt -Item $activeItem }
+                        Rename-ItemPrompt -Item $activeItem -RenderBgBlock $renderFrameLines
+                        $ui.NeedsFullClear = $true
+                        $ui.IndexDirty = $true
                     }
                 }
                 { $_ -in @("X", "Delete") } {
                     if ($activeItem -and $activeItem.Type -ne "Spacer") {
-                        Invoke-Modal { Delete-ItemPrompt -Item $activeItem }
+                        Delete-ItemPrompt -Item $activeItem -RenderBgBlock $renderFrameLines
+                        $ui.NeedsFullClear = $true
+                        $ui.IndexDirty = $true
                     }
                 }
                 "L" {
-                    Invoke-Modal { Quick-Log }
+                    Quick-Log -RenderBgBlock $renderFrameLines
+                    $ui.NeedsFullClear = $true
+                    $ui.IndexDirty = $true
                 }
                 "Oem2" { # '/' key
                     Invoke-Modal { Search-NotesPrompt }

@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.0.0
+**Date:** 2026-10-03
+
+### Major Features
+- **Inline Floating Popup Modal Engine:** Replaced full-screen CLI command prompts with interactive inline floating popup card modals. Creating folders (`[F]`), adding notes (`[N]`), logging quick thoughts (`[L]`), renaming items (`[R]`), and confirming deletions (`[X]`) now open centered popup cards overlaid directly onto the TUI background in real-time.
+- **Real-Time Double-Buffered Overlay:** Modal cards render smoothly on top of the visible navigation tree and preview pane with rounded corners (`╭`, `╮`, `╰`, `╯`), dedicated text input fields, and action buttons (`[Enter] Submit  [Esc] Cancel`).
+
 ## Version 2.9.4
 **Date:** 2026-10-03
 
