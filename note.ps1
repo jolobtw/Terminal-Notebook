@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.9"
+$AppVersion = "2.6.10"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1617,13 +1617,19 @@ function Start-NotebookBrowser {
             # Draw row into buffer
             [void]$sb.Append($cDarkGray + $bVert + $rst)
 
-            if ($isRowSelected) {
-                [void]$sb.Append($cSelected + $leftStr + $rst)
-            } elseif ($isFolderRow) {
-                [void]$sb.Append($cFolder + $leftStr + $rst)
-            } else {
-                [void]$sb.Append($cSilver + $leftStr + $rst)
+            $rowColor = if ($isRowSelected) { $cSelected } elseif ($isFolderRow) { $cFolder } else { $cSilver }
+            $coloredLeftStr = $rowColor + $leftStr + $rst
+            
+            # Subtly color the tree branches DarkGray
+            $b1 = [string][char]0x251C + [string][char]0x2500
+            $b2 = [string][char]0x2514 + [string][char]0x2500
+            if ($coloredLeftStr.Contains($b1)) {
+                $coloredLeftStr = $coloredLeftStr.Replace($b1, $cDarkGray + $b1 + $rowColor)
+            } elseif ($coloredLeftStr.Contains($b2)) {
+                $coloredLeftStr = $coloredLeftStr.Replace($b2, $cDarkGray + $b2 + $rowColor)
             }
+
+            [void]$sb.Append($coloredLeftStr)
 
             [void]$sb.Append($cDarkGray + $bVert + $rst)
 

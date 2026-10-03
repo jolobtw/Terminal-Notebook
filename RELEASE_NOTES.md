@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.10
+**Date:** 2026-10-02
+
+### UI Tweaks
+- **Subtle Tree Hierarchy:** The structural tree connecting branches (`├─` and `└─`) are now explicitly styled in a subtle Dark Gray, preventing them from overpowering the file names and dramatically improving the clean, readable aesthetic of the navigation pane.
+
 ## Version 2.6.9
 **Date:** 2026-10-02
 
