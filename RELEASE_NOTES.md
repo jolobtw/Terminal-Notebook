@@ -112,3 +112,11 @@
 - **Seamless Split-Pane Editor (Windows Terminal Integration):** Completely revolutionized the editing workflow! When running the app inside Windows Terminal, pressing [E] to edit or [N] to create a new note will no longer hijack your screen. Instead, the app seamlessly signals Windows Terminal to split your current tab down the middle. Your Terminal Notebook remains fully active, scrollable, and usable on the left, while your deep-work text editor (micro, 
 ano, 
 vim) opens natively on the right. When you exit your editor, the split-pane vanishes and the tab intelligently merges back to full-screen. This is a massive quality-of-life buff for maintaining context, referencing file names, and reading old notes while writing new ones!
+
+## Version 2.0.1
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Pane Split Tearing:** Fixed a race condition where launching the side-by-side terminal editor caused the Notebook Browser to redraw with its original full-width dimensions before the window could finish resizing, leading to catastrophic line wrapping.
+- **Responsive Redraws:** Overhauled the navigation event loop. The app no longer completely halts while waiting for keystrokes; it now actively polls at 40hz, instantly detecting window size changes (such as when your right-hand split pane closes) and seamlessly repainting the UI back to full-screen.
+- **ANSI Truncation Overflow:** Fixed a bug where colored text strings (like empty folder warnings or dynamic menus) bypassed the right boundary length constraints, shoving the UI border out of alignment on smaller windows.

@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.0"
+$AppVersion = "2.0.1"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
