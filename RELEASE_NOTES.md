@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.1.1
+**Date:** 2026-10-03
+
+### Visual Polish
+- **Dual Subtle Version Placement:** Guaranteed the version tag displays cleanly both in the bottom navigation shortcut legend (`[U] Updates (v3.1.1)`) and embedded right into the Slate Gray bottom border of the main application window (`╰──────┴── v3.1.1 ──────╯`).
+
 ## Version 3.1.0
 **Date:** 2026-10-03
 
