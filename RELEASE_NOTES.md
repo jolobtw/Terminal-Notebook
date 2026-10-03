@@ -1,5 +1,151 @@
 # Terminal Notes Release Notes
 
+## Version 2.5.0
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **Interactive Fullscreen Reader:** Completely refactored the Fullscreen Reader (and in-app Release Notes viewer) to act as an interactive, scrollable pager. Long notes now cleanly start from the very top and can be freely navigated using `Up/Down` or `PageUp/PageDown`, rather than simply dumping text and forcing the console to scroll to the bottom.
+- **Reverse Chronological Release Notes:** Reversed the order of `RELEASE_NOTES.md` so that the newest updates are always presented first at the top of the file.
+
+## Version 2.4.0
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Consistency:** Aligned the width and padding of the Folder Telemetry section with the Note Properties section, ensuring the right and left borders remain perfectly static and don't jump around when navigating between notes and folders.## Version 2.3.0
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Terminal Flickering:** Fixed an issue where the entire terminal (mostly noticeable in the title bar) would flicker continuously. This was caused by the 25ms `Start-Sleep` polling loop triggering PowerShell's default progress bar rendering. The polling loop now explicitly silences progress bars to run invisibly.
+
+## Version 2.2.0
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **UI Consistency:** Applied the sleek, rounded gradient borders (previously only seen on the Folder Telemetry card) to all bordered elements throughout the note viewer! This includes Properties blocks, Fenced Code blocks, Markdown Tables, Blockquotes, and Horizontal Rules. The `Flame Orange -> Graphite` gradient now themes the entire application for a perfectly unified aesthetic.
+
+## Version 2.1.1
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Editor Cursor Placement:** Fixed an annoying bug where opening an existing note in a terminal editor (`micro`, `vim`, `nano`) would place the cursor on the last line containing text (the "last line -1"), rather than on the empty trailing newline. The script now parses the file natively, perfectly preserving trailing newlines and dropping your cursor at the absolute bottom of the file every time.
+
+## Version 2.1.0
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **Streamlined Workflow:** Removed the interstitial prompt when creating or editing a note. The application now seamlessly defaults to opening your preferred terminal editor (like `micro`). If no terminal editor is installed, it intelligently falls back to launching the note in Obsidian.
+- **Native Theming:** When the application launches `micro`, it now automatically applies the `simple` color scheme to natively match the colors of your terminal environment.
+
+## Version 2.0.1
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Pane Split Tearing:** Fixed a race condition where launching the side-by-side terminal editor caused the Notebook Browser to redraw with its original full-width dimensions before the window could finish resizing, leading to catastrophic line wrapping.
+- **Responsive Redraws:** Overhauled the navigation event loop. The app no longer completely halts while waiting for keystrokes; it now actively polls at 40hz, instantly detecting window size changes (such as when your right-hand split pane closes) and seamlessly repainting the UI back to full-screen.
+- **ANSI Truncation Overflow:** Fixed a bug where colored text strings (like empty folder warnings or dynamic menus) bypassed the right boundary length constraints, shoving the UI border out of alignment on smaller windows.
+
+## Version 2.0.0
+**Date:** 2026-10-02
+
+### Major Features
+- **Seamless Split-Pane Editor (Windows Terminal Integration):** Completely revolutionized the editing workflow! When running the app inside Windows Terminal, pressing [E] to edit or [N] to create a new note will no longer hijack your screen. Instead, the app seamlessly signals Windows Terminal to split your current tab down the middle. Your Terminal Notebook remains fully active, scrollable, and usable on the left, while your deep-work text editor (micro, 
+ano, 
+vim) opens natively on the right. When you exit your editor, the split-pane vanishes and the tab intelligently merges back to full-screen. This is a massive quality-of-life buff for maintaining context, referencing file names, and reading old notes while writing new ones!
+
+## Version 1.15
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **Folder Telemetry Redesign:** Completely redesigned the Folder Telemetry card to visually match the sleek Properties box styling used in the Note Reader. The thick 3-line Aurora block graphic was replaced with a thin, gorgeous bounding box that spans the full width of the preview pane. To add visual contrast against the main application header, the telemetry box's gradient is rendered in reverse (Flame Orange to Graphite). 
+
+## Version 1.14
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **UI Consistency:** The top "Terminal Notebook" Aurora gradient banner is now preserved and displayed when diving into the Fullscreen Reader mode (including the Release Notes viewer). The hotkey formatting in the reader mode has also been restyled to exactly match the look of the main application menu.
+
+## Version 1.13
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Conflicting Keybinds:** Fixed a bug where returning from the Release Notes screen would automatically open File Explorer. The V key was originally bound to open the "Vault" in File Explorer, and when we re-assigned it to "What's New" (Release Notes), the old binding was never removed. Since PowerShell evaluates all matching conditions in a switch block, it was triggering both actions sequentially! Removed the old binding.
+
+## Version 1.12
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **The Aurora Banner Overflow:** Discovered the actual root cause of the persistent terminal scrolling and clipping issues. When dynamically calculating the maximum terminal height for the main reading box, the logic completely forgot to subtract the physical height of the beautiful 4-line Aurora gradient banner introduced in 1.0. The UI bounding box was mathematically 4 lines too tall for the terminal, which forced it to constantly scroll and shove the top title bar completely off the screen! Fixed the box height subtraction engine to properly account for the banner.
+
+## Version 1.11
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Console Word-Wrap Clipping:** Discovered an ultra-specific boundary edge case: if the dynamic navigation bar happened to calculate a length that perfectly matched your exact terminal width, the Windows Console would implicitly wrap the cursor to a phantom new line *before* our code explicitly wrapped it. This injected an invisible blank line into the UI, throwing off the pixel-perfect layout math, causing the terminal to scroll down by 1 line, which shoved the top title bar off the screen. Refactored the math to wrap at Width - 1 to strictly forbid implicit console wrapping.
+
+## Version 1.10
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Garbled Array Flattening:** Fixed a bug where PowerShell's array-flattening behavior caused single-item menu additions (like the folder Expand key) to be split into individual characters, drastically expanding the menu.
+- **Title Bar Overflow:** Re-tuned the height constraints (Max(5)) to prevent aggressive window resizing from causing the header to clip off the screen.
+- **Flicker-Free Navigation:** Implemented a static "worst-case" menu padder. The application now perfectly anticipates the maximum height the responsive menu *could* take and locks the UI box to that height. This completely eradicates all layout bouncing and flickering when navigating between folders and notes.
+
+## Version 1.9
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **Context-Aware Navigation Bar:** The bottom navigation bar is now context-aware! Actions like [O] Obsidian, [E] Edit, and [Enter] View will only appear when you actually have a Note highlighted. When highlighting a Folder, the menu slims down and switches [Enter] to expand/collapse.
+- **Dynamic Responsive Layout:** Re-wrote the terminal height and UI rendering logic. The navigation bar now perfectly wraps and dynamically scales the height of the main interface based on your terminal's width, preventing any lingering ghost menus or scroll-tearing on narrower terminal windows.
+
+## Version 1.8
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Electron Log Bleed (Absolute Fix):** Fixed the persistent Obsidian text bleed issue by passing the command through a hidden cmd.exe /c start sub-process with fully trapped standard I/O streams. The Electron auto-updater logs can no longer reach the host terminal under any circumstances.
+
+## Version 1.7
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Electron Log Bleed:** Fixed an issue where the Obsidian Electron app would inherit the terminal's standard output handles and dump its startup logs (e.g., auto-updater checks) directly into the Terminal Notes interface. We now explicitly use System.Diagnostics.ProcessStartInfo with ShellExecute to enforce complete background detachment.
+
+## Version 1.6
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Overflow:** Fixed a persistent issue where opening a note in Obsidian without a properly registered protocol handler caused a native PowerShell error stream to dump into the console, breaking the UI layout and leaving duplicate ghost menus. The launch command now properly swallows non-terminating errors.
+
+## Version 1.5
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Overflow:** Fixed an issue where opening a note in Obsidian directly from the navigation browser would print a success message to the bottom of the screen, causing the terminal window to shift upward and creating duplicate rows of the navigation bar. The Obsidian integration now launches silently in the background to prevent interface layout breaks.
+
+## Version 1.4
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **Read-Only Mode:** Added a -ReadOnly flag to the Fullscreen Reader.
+- **Release Notes Protection:** The in-app release notes viewer now correctly launches in Read-Only mode to prevent accidental edits.
+
+## Version 1.3
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Overflow:** Fixed an issue where the delete confirmation prompt didn't clear the screen before appearing, causing the main browser UI to be pushed upward and off the screen. The delete prompt now launches cleanly in a fullscreen modal view matching the rest of the application's style.
+
+## Version 1.2
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Flickering:** Fixed an issue where the new navigation hotkeys caused the footer bar to exceed standard terminal widths, wrapping to a new line and triggering a scrolling flicker. The hotkeys are now cleanly organized across two lines, and the layout engine perfectly compensates for the height.
+
+## Version 1.1
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **UI Rendering:** Fixed a visual bug where the right-hand border was missing from Markdown Properties blocks and Fenced Code blocks. They now dynamically scale and draw their right borders correctly based on terminal width.
+
 ## Version 1.0
 **Date:** 2026-10-02
 
@@ -11,143 +157,4 @@
 - **Quick Logging:** Rapid text entry mode directly inside the terminal without needing to boot up a full editor.
 - **Flicker-Free Rendering:** Optimized double-buffered screen rendering to prevent UI flashing during navigation.
 
-## Version 1.1
-**Date:** 2026-10-02
 
-### Bug Fixes
-- **UI Rendering:** Fixed a visual bug where the right-hand border was missing from Markdown Properties blocks and Fenced Code blocks. They now dynamically scale and draw their right borders correctly based on terminal width.
-
-## Version 1.2
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **UI Flickering:** Fixed an issue where the new navigation hotkeys caused the footer bar to exceed standard terminal widths, wrapping to a new line and triggering a scrolling flicker. The hotkeys are now cleanly organized across two lines, and the layout engine perfectly compensates for the height.
-
-## Version 1.3
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **UI Overflow:** Fixed an issue where the delete confirmation prompt didn't clear the screen before appearing, causing the main browser UI to be pushed upward and off the screen. The delete prompt now launches cleanly in a fullscreen modal view matching the rest of the application's style.
-
-## Version 1.4
-**Date:** 2026-10-02
-
-### Features & Tweaks
-- **Read-Only Mode:** Added a -ReadOnly flag to the Fullscreen Reader.
-- **Release Notes Protection:** The in-app release notes viewer now correctly launches in Read-Only mode to prevent accidental edits.
-
-## Version 1.5
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **UI Overflow:** Fixed an issue where opening a note in Obsidian directly from the navigation browser would print a success message to the bottom of the screen, causing the terminal window to shift upward and creating duplicate rows of the navigation bar. The Obsidian integration now launches silently in the background to prevent interface layout breaks.
-
-## Version 1.6
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **UI Overflow:** Fixed a persistent issue where opening a note in Obsidian without a properly registered protocol handler caused a native PowerShell error stream to dump into the console, breaking the UI layout and leaving duplicate ghost menus. The launch command now properly swallows non-terminating errors.
-
-## Version 1.7
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **Electron Log Bleed:** Fixed an issue where the Obsidian Electron app would inherit the terminal's standard output handles and dump its startup logs (e.g., auto-updater checks) directly into the Terminal Notes interface. We now explicitly use System.Diagnostics.ProcessStartInfo with ShellExecute to enforce complete background detachment.
-
-## Version 1.8
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **Electron Log Bleed (Absolute Fix):** Fixed the persistent Obsidian text bleed issue by passing the command through a hidden cmd.exe /c start sub-process with fully trapped standard I/O streams. The Electron auto-updater logs can no longer reach the host terminal under any circumstances.
-
-## Version 1.9
-**Date:** 2026-10-02
-
-### Features & Tweaks
-- **Context-Aware Navigation Bar:** The bottom navigation bar is now context-aware! Actions like [O] Obsidian, [E] Edit, and [Enter] View will only appear when you actually have a Note highlighted. When highlighting a Folder, the menu slims down and switches [Enter] to expand/collapse.
-- **Dynamic Responsive Layout:** Re-wrote the terminal height and UI rendering logic. The navigation bar now perfectly wraps and dynamically scales the height of the main interface based on your terminal's width, preventing any lingering ghost menus or scroll-tearing on narrower terminal windows.
-
-## Version 1.10
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **Garbled Array Flattening:** Fixed a bug where PowerShell's array-flattening behavior caused single-item menu additions (like the folder Expand key) to be split into individual characters, drastically expanding the menu.
-- **Title Bar Overflow:** Re-tuned the height constraints (Max(5)) to prevent aggressive window resizing from causing the header to clip off the screen.
-- **Flicker-Free Navigation:** Implemented a static "worst-case" menu padder. The application now perfectly anticipates the maximum height the responsive menu *could* take and locks the UI box to that height. This completely eradicates all layout bouncing and flickering when navigating between folders and notes.
-
-## Version 1.11
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **Console Word-Wrap Clipping:** Discovered an ultra-specific boundary edge case: if the dynamic navigation bar happened to calculate a length that perfectly matched your exact terminal width, the Windows Console would implicitly wrap the cursor to a phantom new line *before* our code explicitly wrapped it. This injected an invisible blank line into the UI, throwing off the pixel-perfect layout math, causing the terminal to scroll down by 1 line, which shoved the top title bar off the screen. Refactored the math to wrap at Width - 1 to strictly forbid implicit console wrapping.
-
-## Version 1.12
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **The Aurora Banner Overflow:** Discovered the actual root cause of the persistent terminal scrolling and clipping issues. When dynamically calculating the maximum terminal height for the main reading box, the logic completely forgot to subtract the physical height of the beautiful 4-line Aurora gradient banner introduced in 1.0. The UI bounding box was mathematically 4 lines too tall for the terminal, which forced it to constantly scroll and shove the top title bar completely off the screen! Fixed the box height subtraction engine to properly account for the banner.
-
-## Version 1.13
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **Conflicting Keybinds:** Fixed a bug where returning from the Release Notes screen would automatically open File Explorer. The V key was originally bound to open the "Vault" in File Explorer, and when we re-assigned it to "What's New" (Release Notes), the old binding was never removed. Since PowerShell evaluates all matching conditions in a switch block, it was triggering both actions sequentially! Removed the old binding.
-
-## Version 1.14
-**Date:** 2026-10-02
-
-### Features & Tweaks
-- **UI Consistency:** The top "Terminal Notebook" Aurora gradient banner is now preserved and displayed when diving into the Fullscreen Reader mode (including the Release Notes viewer). The hotkey formatting in the reader mode has also been restyled to exactly match the look of the main application menu.
-
-## Version 1.15
-**Date:** 2026-10-02
-
-### Features & Tweaks
-- **Folder Telemetry Redesign:** Completely redesigned the Folder Telemetry card to visually match the sleek Properties box styling used in the Note Reader. The thick 3-line Aurora block graphic was replaced with a thin, gorgeous bounding box that spans the full width of the preview pane. To add visual contrast against the main application header, the telemetry box's gradient is rendered in reverse (Flame Orange to Graphite). 
-
-## Version 2.0.0
-**Date:** 2026-10-02
-
-### Major Features
-- **Seamless Split-Pane Editor (Windows Terminal Integration):** Completely revolutionized the editing workflow! When running the app inside Windows Terminal, pressing [E] to edit or [N] to create a new note will no longer hijack your screen. Instead, the app seamlessly signals Windows Terminal to split your current tab down the middle. Your Terminal Notebook remains fully active, scrollable, and usable on the left, while your deep-work text editor (micro, 
-ano, 
-vim) opens natively on the right. When you exit your editor, the split-pane vanishes and the tab intelligently merges back to full-screen. This is a massive quality-of-life buff for maintaining context, referencing file names, and reading old notes while writing new ones!
-
-## Version 2.0.1
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **Pane Split Tearing:** Fixed a race condition where launching the side-by-side terminal editor caused the Notebook Browser to redraw with its original full-width dimensions before the window could finish resizing, leading to catastrophic line wrapping.
-- **Responsive Redraws:** Overhauled the navigation event loop. The app no longer completely halts while waiting for keystrokes; it now actively polls at 40hz, instantly detecting window size changes (such as when your right-hand split pane closes) and seamlessly repainting the UI back to full-screen.
-- **ANSI Truncation Overflow:** Fixed a bug where colored text strings (like empty folder warnings or dynamic menus) bypassed the right boundary length constraints, shoving the UI border out of alignment on smaller windows.
-
-## Version 2.1.0
-**Date:** 2026-10-02
-
-### Features & Tweaks
-- **Streamlined Workflow:** Removed the interstitial prompt when creating or editing a note. The application now seamlessly defaults to opening your preferred terminal editor (like `micro`). If no terminal editor is installed, it intelligently falls back to launching the note in Obsidian.
-- **Native Theming:** When the application launches `micro`, it now automatically applies the `simple` color scheme to natively match the colors of your terminal environment.
-
-## Version 2.1.1
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **Editor Cursor Placement:** Fixed an annoying bug where opening an existing note in a terminal editor (`micro`, `vim`, `nano`) would place the cursor on the last line containing text (the "last line -1"), rather than on the empty trailing newline. The script now parses the file natively, perfectly preserving trailing newlines and dropping your cursor at the absolute bottom of the file every time.
-
-## Version 2.2.0
-**Date:** 2026-10-02
-
-### Features & Tweaks
-- **UI Consistency:** Applied the sleek, rounded gradient borders (previously only seen on the Folder Telemetry card) to all bordered elements throughout the note viewer! This includes Properties blocks, Fenced Code blocks, Markdown Tables, Blockquotes, and Horizontal Rules. The `Flame Orange -> Graphite` gradient now themes the entire application for a perfectly unified aesthetic.
-
-## Version 2.3.0
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **Terminal Flickering:** Fixed an issue where the entire terminal (mostly noticeable in the title bar) would flicker continuously. This was caused by the 25ms `Start-Sleep` polling loop triggering PowerShell's default progress bar rendering. The polling loop now explicitly silences progress bars to run invisibly.
-
-## Version 2.4.0
-**Date:** 2026-10-02
-
-### Bug Fixes
-- **UI Consistency:** Aligned the width and padding of the Folder Telemetry section with the Note Properties section, ensuring the right and left borders remain perfectly static and don't jump around when navigating between notes and folders.

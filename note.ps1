@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.4.0"
+$AppVersion = "2.5.0"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1127,50 +1127,86 @@ function View-FullscreenNote {
     $borderLine = "=" * [Math]::Min(120, $termW)
     $divLine    = "-" * [Math]::Min(120, $termW)
 
-    Clear-Host
-    Write-Host (Render-HeaderBanner $termW)
-    Write-Host ""
-    Write-Host $borderLine -ForegroundColor DarkGray
-    $modeTag = if ($ReadOnly) { $cGray + " [Read-Only]" } else { "" }
-    Write-Host ($cOrange + " Fullscreen Reader: " + $rst + $cWhite + $File.Name + $modeTag + $rst)
-    Write-Host (" Path: " + $cGray + $File.FullName + $rst)
-    Write-Host $borderLine -ForegroundColor DarkGray
-    Write-Host ""
-
     $lines = Get-Content -Path $File.FullName
     $textWidth = [Math]::Max(30, $termW - 2)
-    $renderedLines = Convert-MarkdownToTerminalLines -RawLines $lines -Width $textWidth
+    $renderedLines = @(Convert-MarkdownToTerminalLines -RawLines $lines -Width $textWidth)
 
-    foreach ($rl in $renderedLines) {
-        [Console]::WriteLine($rl)
-    }
+    $scrollOffset = 0
 
-    Write-Host "`n$borderLine" -ForegroundColor DarkGray
-    
-    # Standardized Footer Formatting
-    $footer = " "
-    if ($ReadOnly) {
-        $footer += $cOrange + "[Any key]" + $cSilver + " Return..."
-        Write-Host ($footer + $rst)
+    while ($true) {
+        $termH = 24
         try {
-            [Console]::ReadKey($true) | Out-Null
+            if ([Console]::WindowHeight -gt 10) { $termH = [Console]::WindowHeight }
         } catch {}
-    } else {
-        $footer += $cOrange + "[E]" + $cSilver + " Edit  " + 
-                   $cOrange + "[O]" + $cSilver + " Obsidian  " + 
-                   $cOrange + "[P]" + $cSilver + " Append  " + 
-                   $cOrange + "[Any key]" + $cSilver + " Return..."
-        Write-Host ($footer + $rst)
-        try {
-            $k = [Console]::ReadKey($true)
-            if ($k.Key -eq "E") {
-                Edit-NoteFile -File $File
-            } elseif ($k.Key -eq "O") {
-                Open-InObsidian -File $File
-            } elseif ($k.Key -in @("A", "P")) {
-                Append-ToNote -File $File
-            }
-        } catch {}
+        
+        $viewHeight = [Math]::Max(5, $termH - 13)
+        $maxScroll = [Math]::Max(0, $renderedLines.Count - $viewHeight)
+        if ($scrollOffset -gt $maxScroll) { $scrollOffset = $maxScroll }
+
+        Clear-Host
+        Write-Host (Render-HeaderBanner $termW)
+        Write-Host ""
+        Write-Host $borderLine -ForegroundColor DarkGray
+        $modeTag = if ($ReadOnly) { $cGray + " [Read-Only]" } else { "" }
+        Write-Host ($cOrange + " Fullscreen Reader: " + $rst + $cWhite + $File.Name + $modeTag + $rst)
+        Write-Host (" Path: " + $cGray + $File.FullName + $rst)
+        Write-Host $borderLine -ForegroundColor DarkGray
+        Write-Host ""
+
+        $visEnd = [Math]::Min($renderedLines.Count, $scrollOffset + $viewHeight)
+        for ($i = $scrollOffset; $i -lt $visEnd; $i++) {
+            [Console]::WriteLine($renderedLines[$i])
+        }
+
+        for ($i = $visEnd - $scrollOffset; $i -lt $viewHeight; $i++) {
+            [Console]::WriteLine("")
+        }
+
+        Write-Host "`n$borderLine" -ForegroundColor DarkGray
+        
+        $footer = " "
+        $scrollNotice = if ($renderedLines.Count -gt $viewHeight) { $cGray + "  [$($scrollOffset + 1)-$visEnd of $($renderedLines.Count)] " } else { "" }
+
+        if ($ReadOnly) {
+            $footer += $cOrange + "[Up/Dn/PgUp/PgDn]" + $cSilver + " Scroll  " + 
+                       $cOrange + "[Q/Esc]" + $cSilver + " Return..." + $scrollNotice
+            Write-Host ($footer + $rst)
+            try {
+                $k = [Console]::ReadKey($true)
+                $key = $k.Key
+                if ($key -in @("UpArrow", "W", "K")) { $scrollOffset = [Math]::Max(0, $scrollOffset - 1) }
+                elseif ($key -in @("DownArrow", "S", "J")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + 1) }
+                elseif ($key -eq "PageUp") { $scrollOffset = [Math]::Max(0, $scrollOffset - $viewHeight) }
+                elseif ($key -in @("PageDown", "Spacebar")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + $viewHeight) }
+                elseif ($key -in @("Escape", "Q", "Enter", "Backspace")) { break }
+            } catch { break }
+        } else {
+            $footer += $cOrange + "[Up/Dn/PgUp/PgDn]" + $cSilver + " Scroll  " + 
+                       $cOrange + "[E]" + $cSilver + " Edit  " + 
+                       $cOrange + "[O]" + $cSilver + " Obsidian  " + 
+                       $cOrange + "[P]" + $cSilver + " Append  " + 
+                       $cOrange + "[Q/Esc]" + $cSilver + " Return..." + $scrollNotice
+            Write-Host ($footer + $rst)
+            try {
+                $k = [Console]::ReadKey($true)
+                $key = $k.Key
+                if ($key -in @("UpArrow", "W", "K")) { $scrollOffset = [Math]::Max(0, $scrollOffset - 1) }
+                elseif ($key -in @("DownArrow", "S", "J")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + 1) }
+                elseif ($key -eq "PageUp") { $scrollOffset = [Math]::Max(0, $scrollOffset - $viewHeight) }
+                elseif ($key -in @("PageDown", "Spacebar")) { $scrollOffset = [Math]::Min($maxScroll, $scrollOffset + $viewHeight) }
+                elseif ($key -in @("Escape", "Q", "Enter", "Backspace")) { break }
+                elseif ($key -eq "E") {
+                    Edit-NoteFile -File $File
+                    break
+                } elseif ($key -eq "O") {
+                    Open-InObsidian -File $File
+                    break
+                } elseif ($key -in @("A", "P")) {
+                    Append-ToNote -File $File
+                    break
+                }
+            } catch { break }
+        }
     }
 }
 

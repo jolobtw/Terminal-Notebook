@@ -53,7 +53,7 @@ Set-Alias -Name note -Value "C:\path\to\TerminalNotes\note.ps1"
 * `[X]` - Delete item
 * `[E]` - Edit Note (opens automatically in terminal editor)
 * `[O]` - Open in Obsidian
-* `[Enter]` - Fullscreen Reader
+* `[Enter]` - Fullscreen Reader (Supports scrolling via `Up/Down` or `PageUp/PageDown`)
 
 ## License
 MIT License
