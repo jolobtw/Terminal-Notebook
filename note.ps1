@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.2.4"
+$AppVersion = "3.2.5"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1611,25 +1611,30 @@ function New-FolderPrompt {
     if ($RenderBgBlock) {
         $relPath = Get-RelativeNotePath $targetParent
         $sub = if ($relPath) { "Location: ~/Notes/$relPath" } else { "Location: ~/Notes" }
-        $folderName = Show-InlineInputModal -Title "CREATE NEW FOLDER" -Subtitle $sub -PromptLabel "Folder Name:" -ConfirmActionLabel "Create" -RenderBgBlock $RenderBgBlock
+        $inputVal = ""
+        while ($true) {
+            $folderName = Show-InlineInputModal -Title "CREATE NEW FOLDER" -Subtitle $sub -PromptLabel "Folder Name:" -InitialValue $inputVal -ConfirmActionLabel "Create" -RenderBgBlock $RenderBgBlock
 
-        if ([string]::IsNullOrWhiteSpace($folderName)) { return }
+            if ([string]::IsNullOrWhiteSpace($folderName)) { return }
 
-        $safeName = ConvertTo-Slug $folderName
-        if (-not $safeName) {
-            Show-InlineAlertModal -Title "INVALID FOLDER NAME" -Message "The folder name '$folderName' is invalid." -SubMessage "Please use letters, numbers, spaces, or hyphens." -RenderBgBlock $RenderBgBlock
+            $safeName = ConvertTo-Slug $folderName
+            if (-not $safeName) {
+                Show-InlineAlertModal -Title "INVALID FOLDER NAME" -Message "The folder name '$folderName' is invalid." -SubMessage "Please use letters, numbers, spaces, or hyphens." -RenderBgBlock $RenderBgBlock
+                $inputVal = $folderName
+                continue
+            }
+            $newFolderPath = Join-Path $targetParent $safeName
+
+            if (Test-Path -LiteralPath $newFolderPath) {
+                Show-InlineAlertModal -Title "FOLDER ALREADY EXISTS" -Message "Folder '$safeName' already exists in this location." -SubMessage "Please choose a different name for your folder." -RenderBgBlock $RenderBgBlock
+                $inputVal = $folderName
+                continue
+            }
+
+            [void][System.IO.Directory]::CreateDirectory($newFolderPath)
+            $script:LastActionPath = $newFolderPath
             return
         }
-        $newFolderPath = Join-Path $targetParent $safeName
-
-        if (Test-Path -LiteralPath $newFolderPath) {
-            Show-InlineAlertModal -Title "FOLDER ALREADY EXISTS" -Message "Folder '$safeName' already exists in this location." -SubMessage "Please choose a different name for your folder." -RenderBgBlock $RenderBgBlock
-            return
-        }
-
-        [void][System.IO.Directory]::CreateDirectory($newFolderPath)
-        $script:LastActionPath = $newFolderPath
-        return
     }
 
     Write-ModalHeader "CREATE NEW FOLDER"
@@ -1679,31 +1684,36 @@ function Rename-ItemPrompt {
 
     if ($RenderBgBlock) {
         $initName = if ($isFolder) { $Item.Name } else { $Item.BaseName }
-        $newName = Show-InlineInputModal -Title "RENAME ITEM" -Subtitle "Current: $($Item.Name)" -PromptLabel "New Name:" -InitialValue $initName -ConfirmActionLabel "Rename" -RenderBgBlock $RenderBgBlock
+        $inputVal = $initName
+        while ($true) {
+            $newName = Show-InlineInputModal -Title "RENAME ITEM" -Subtitle "Current: $($Item.Name)" -PromptLabel "New Name:" -InitialValue $inputVal -ConfirmActionLabel "Rename" -RenderBgBlock $RenderBgBlock
 
-        if ([string]::IsNullOrWhiteSpace($newName)) { return }
+            if ([string]::IsNullOrWhiteSpace($newName)) { return }
 
-        $safeName = if ($isFolder) { ConvertTo-Slug $newName } else { ConvertTo-Slug $newName -Lower }
-        if (-not $safeName) {
-            Show-InlineAlertModal -Title "INVALID NAME" -Message "The name '$newName' is invalid." -SubMessage "Please use letters, numbers, spaces, or hyphens." -RenderBgBlock $RenderBgBlock
+            $safeName = if ($isFolder) { ConvertTo-Slug $newName } else { ConvertTo-Slug $newName -Lower }
+            if (-not $safeName) {
+                Show-InlineAlertModal -Title "INVALID NAME" -Message "The name '$newName' is invalid." -SubMessage "Please use letters, numbers, spaces, or hyphens." -RenderBgBlock $RenderBgBlock
+                $inputVal = $newName
+                continue
+            }
+            if (-not $isFolder) { $safeName += ".md" }
+
+            $newPath = Join-Path (Split-Path $Item.FullName -Parent) $safeName
+            if (Test-Path -LiteralPath $newPath -and $newPath.ToLower() -ne $Item.FullName.ToLower()) {
+                $itemTypeStr = if ($isFolder) { "Folder" } else { "Note" }
+                Show-InlineAlertModal -Title "ITEM ALREADY EXISTS" -Message "$itemTypeStr '$safeName' already exists in this location." -SubMessage "Please choose a different name." -RenderBgBlock $RenderBgBlock
+                $inputVal = $newName
+                continue
+            }
+
+            Rename-Item -LiteralPath $Item.FullName -NewName $safeName
+            if ($isFolder -and $script:CollapsedFolders.ContainsKey($Item.FullName)) {
+                $script:CollapsedFolders.Remove($Item.FullName)
+                $script:CollapsedFolders[$newPath] = $true
+            }
+            $script:LastActionPath = $newPath
             return
         }
-        if (-not $isFolder) { $safeName += ".md" }
-
-        $newPath = Join-Path (Split-Path $Item.FullName -Parent) $safeName
-        if (Test-Path -LiteralPath $newPath) {
-            $itemTypeStr = if ($isFolder) { "Folder" } else { "Note" }
-            Show-InlineAlertModal -Title "ITEM ALREADY EXISTS" -Message "$itemTypeStr '$safeName' already exists in this location." -SubMessage "Please choose a different name." -RenderBgBlock $RenderBgBlock
-            return
-        }
-
-        Rename-Item -LiteralPath $Item.FullName -NewName $safeName
-        if ($isFolder -and $script:CollapsedFolders.ContainsKey($Item.FullName)) {
-            $script:CollapsedFolders.Remove($Item.FullName)
-            $script:CollapsedFolders[$newPath] = $true
-        }
-        $script:LastActionPath = $newPath
-        return
     }
 
     Write-ModalHeader "RENAME" -Color Cyan

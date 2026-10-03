@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.2.5
+**Date:** 2026-10-03
+
+### Modal Error Loop & Re-Prompting Workflow
+- **Automatic Input Re-Prompting:** Acknowledging a duplicate folder or rename error modal now returns directly to the input popup (`CREATE NEW FOLDER` or `RENAME ITEM`) pre-populated with your entry, allowing seamless name corrections without exiting to the main view.
+
 ## Version 3.2.4
 **Date:** 2026-10-03
 
