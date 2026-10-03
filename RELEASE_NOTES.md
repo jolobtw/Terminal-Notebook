@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 2.9.3
+**Date:** 2026-10-03
+
+### Bug Fixes
+- **Right Outer Border Clipping & Terminal Autowrap:** Fixed an issue where drawing a box of width equal to `[Console]::WindowWidth` placed the rightmost border character in the last terminal column, triggering VT autowrap and causing the right border to be clipped or scrolled off-screen. Reserving a 1-column safety margin (`$termWidth = [Console]::WindowWidth - 1`) ensures that the outer border and corners (`╮`, `│`, `╯`) remain crisp and fully visible on all terminal window sizes.
+
 ## Version 2.9.2
 **Date:** 2026-10-03
 

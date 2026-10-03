@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "2.9.2"
+$AppVersion = "2.9.3"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1487,10 +1487,10 @@ function View-FullscreenNote {
     $modeTag = if ($ReadOnly) { $cGray + " [Read-Only]" } else { "" }
 
     while ($true) {
-        $termWidth = 100
+        $termWidth = 99
         $termHeight = 26
         try {
-            if ([Console]::WindowWidth -gt 50) { $termWidth = [Console]::WindowWidth }
+            if ([Console]::WindowWidth -gt 50) { $termWidth = [Console]::WindowWidth - 1 }
             if ([Console]::WindowHeight -gt 15) { $termHeight = [Console]::WindowHeight }
         } catch {}
 
@@ -1715,11 +1715,11 @@ function Start-NotebookBrowser {
                 $selectedIndex = [Math]::Max(0, $treeItems.Count - 1)
             }
 
-            # Terminal dimensions
-            $termWidth = 100
+            # Terminal dimensions (reserve 1 col right margin to prevent autowrap clipping)
+            $termWidth = 99
             $termHeight = 26
             try {
-                if ([Console]::WindowWidth -gt 20) { $termWidth = [Console]::WindowWidth }
+                if ([Console]::WindowWidth -gt 20) { $termWidth = [Console]::WindowWidth - 1 }
                 if ([Console]::WindowHeight -gt 10) { $termHeight = [Console]::WindowHeight }
             } catch {}
 
