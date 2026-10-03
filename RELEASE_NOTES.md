@@ -4,43 +4,40 @@
 **Date:** 2026-10-03
 
 ### Bug Fixes & Visual Polish
-- **Text Entry Row Inner & Outer Border Alignment:** Eliminated mid-line ANSI reset codes (`$rst`) inside the input modal's text field row (`Show-InlineInputModal`). Mid-line resets were causing terminal color transitions to shift character boundaries, making the inner text box border (`│`) and outer card border (`│`) appear offset by a space on text entry lines.
-- **Clean Background State Transitions:** Streamlined color attribute switching (`$cCardBg` -> `$cInputBg` -> `$cCardBg`) without intermediary resets, guaranteeing 100% pixel-perfect vertical alignment for all inner input box borders and outer modal card borders.
+- **Text Box Border Alignment:** Fixed an issue where the inner border around text input fields was misaligned by a character relative to the popup card's outer border. Text fields and popup borders now align with clean vertical lines across all prompt dialogs.
 
 ## Version 3.0.4
 **Date:** 2026-10-03
 
 ### Bug Fixes & Visual Polish
-- **Solid Dark Slate Card Backgrounds:** Applied opaque dark slate background styling (`bg 34 37 48` for input modals and `bg 44 32 34` for confirmation modals) to all inline popup card lines (`[N]`, `[F]`, `[R]`, `[X]`, `[L]`). This completely hides background tree/preview text behind the modal card, making the modal an opaque floating card element.
-- **Unified Side Border Contrast:** Standardized top, side (`│`), and bottom border colors to vibrant Flame Orange (`#FF8C1E`) and Hot Orange-Red, ensuring left and right card side borders render with 100% full visual continuity and crisp contrast against the background TUI.
+- **Opaque Popup Card Backgrounds:** Added a solid dark background to all popup dialogs (`[N]`, `[F]`, `[R]`, `[X]`, `[L]`). Popup cards now clearly stand out on top of your note tree and preview pane without background text bleeding through.
+- **Consistent Popup Borders:** Standardized popup card borders with vibrant Flame Orange and Hot Orange-Red accents, ensuring left and right card side borders display clearly on all terminal themes.
 
 ## Version 3.0.3
 **Date:** 2026-10-03
 
 ### Bug Fixes
-- **Modal Card Footer Line Length Overflow:** Fixed hardcoded visible character count math in `Show-InlineInputModal` and `Show-InlineConfirmModal` footers. The static numbers missed 4 and 2 visible characters respectively, causing footer bottom border rows (`╰──── [Enter] Submit ... ────╯`) to calculate as `$cardW + 4` and `$cardW + 2` wide and trigger VT line wrapping, which distorted the right app border and shifted all lower TUI elements down by 1 row.
-- **Dynamic ANSI Strip Length & Defensive Width Clamping:** Replaced static footer length constants with dynamic `$AnsiRegex.Replace($footerKeys, '').Length` calculations, and added defensive visible width normalization in `Overlay-ModalOnFrame` (`$modalVisLen == $mw`) to strictly guarantee zero terminal line wrapping under all conditions.
+- **Popup Border Line Wrapping:** Resolved an issue where long popup button labels caused the popup's bottom border to wrap onto a new line, distorting the main window border and shifting lower screen elements down.
 
 ## Version 3.0.2
 **Date:** 2026-10-03
 
 ### Bug Fixes
-- **Popup Modal Border Clipping & Frame ANSI Corruption:** Resolved issue where background line ANSI parsing caused popup modal cards (`[N]`, `[F]`, `[R]`, `[X]`, `[L]`) to corrupt preview text colors and strip the application's rightmost outer border (`│`, `╮`, `╯`).
-- **Explicit 3-Segment Frame Slicing & Right Border Preservation:** Implemented explicit 3-segment overlay logic (`$leftBg` + `$modalCard` + `$rightPreview` + `$rightBorder`) with exact `Get-PlainSubstring` offset math and automated right border ANSI color extraction (`Get-RightBorderANSI`), ensuring 100% pixel-perfect frame alignment and preserving the outer top-to-bottom border gradient when modals are visible.
+- **Popup Overlay Layout Alignment:** Fixed an issue where opening a popup modal corrupted preview pane text formatting and stripped the rightmost border of the main application window.
+- **Outer Border Gradient Preservation:** Guaranteed that the main application frame's top-to-bottom gray-to-orange border gradient remains intact whenever a popup dialog is visible.
 
 ## Version 3.0.1
 **Date:** 2026-10-03
 
 ### Bug Fixes
-- **Inline Popup Border Alignment & Right-Side Clipping:** Resolved an issue where input box and footer card rows in popup modals were calculating width as `$cardW + 2`, causing the right vertical border of the popup to stick out and be clipped by the frame overlay.
-- **Background Frame ANSI Color Preservation:** Updated `Get-AnsiTail` to capture active ANSI color state up to the modal overlay column, restoring full color styling to the right pane and outer app borders while modals are displayed.
+- **Popup Card Width & Alignment:** Fixed minor width calculation issues in input dialogs that caused right-side popup card borders to clip or extend beyond the card frame.
 
 ## Version 3.0.0
 **Date:** 2026-10-03
 
 ### Major Features
-- **Inline Floating Popup Modal Engine:** Replaced full-screen CLI command prompts with interactive inline floating popup card modals. Creating folders (`[F]`), adding notes (`[N]`), logging quick thoughts (`[L]`), renaming items (`[R]`), and confirming deletions (`[X]`) now open centered popup cards overlaid directly onto the TUI background in real-time.
-- **Real-Time Double-Buffered Overlay:** Modal cards render smoothly on top of the visible navigation tree and preview pane with rounded corners (`╭`, `╮`, `╰`, `╯`), dedicated text input fields, and action buttons (`[Enter] Submit  [Esc] Cancel`).
+- **Inline Floating Popup Modals:** Replaced full-screen command prompts with interactive floating popup dialogs. Creating folders (`[F]`), creating notes (`[N]`), logging quick thoughts (`[L]`), renaming items (`[R]`), and confirming deletions (`[X]`) now open centered popup cards directly over the main browser interface in real time.
+- **Seamless Interactive Prompts:** Popup dialogs feature rounded corners, dedicated text entry boxes, clear action hints (`[Enter] Submit`, `[Esc] Cancel`), and instant keypress handling without switching screens.
 
 ## Version 2.9.4
 **Date:** 2026-10-03
@@ -52,7 +49,7 @@
 **Date:** 2026-10-03
 
 ### Bug Fixes
-- **Right Outer Border Clipping & Terminal Autowrap:** Fixed an issue where drawing a box of width equal to `[Console]::WindowWidth` placed the rightmost border character in the last terminal column, triggering VT autowrap and causing the right border to be clipped or scrolled off-screen. Reserving a 1-column safety margin (`$termWidth = [Console]::WindowWidth - 1`) ensures that the outer border and corners (`╮`, `│`, `╯`) remain crisp and fully visible on all terminal window sizes.
+- **Right Outer Border Clipping:** Fixed an issue where the right border of the application window could clip or scroll off-screen on certain terminal window sizes. Reserving a safety margin ensures the right border and corners (`╮`, `│`, `╯`) remain crisp and fully visible across all terminal window sizes.
 
 ## Version 2.9.2
 **Date:** 2026-10-03
@@ -65,13 +62,13 @@
 **Date:** 2026-10-03
 
 ### Bug Fixes
-- **Expand / Collapse All Responsiveness:** Fixed PowerShell variable scoping issue in `Expand-AllFolders` and `Collapse-AllFolders` where `$itemsDirty` state mutation was confined to local helper scope, ensuring immediate view re-renders upon toggling all folders.
-- **Action Legend Text Jumbling:** Applied ANSI Erase-in-Line (`$esc[K`) across all pane line writes, eliminating persistent ghosting/jumbling of legacy action items when moving between tree elements with different action counts.
+- **Expand / Collapse All Responsiveness:** Fixed an issue where toggling all folders at once didn't immediately update the tree view. Expanding or collapsing all folders now instantly refreshes the view.
+- **Action Legend Text Cleanup:** Resolved text overlap issues in the bottom action bar where lingering shortcuts from previous selections remained visible when navigating between folders and notes.
 
 ### UI Polish
 - **Header & Title Styling:** Standardized pane titles (`WORKSPACE: <Name>` and `Preview`) in Flame Orange with consistent spacing and top margin buffer.
-- **Preview Pane Header:** Simplified preview title display to always cleanly show `Preview` without embedding long file names in the header border.
-- **Folder Telemetry Label:** Fixed casing of the telemetry section header to `Folder Telemetry`.
+- **Preview Pane Header:** Simplified preview title display to cleanly show `Preview` without embedding long file names in the header border.
+- **Folder Telemetry Label:** Standardized header casing for the telemetry section to `Folder Telemetry`.
 
 ## Version 2.9.0
 **Date:** 2026-10-03
