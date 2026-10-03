@@ -1,5 +1,12 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.6
+**Date:** 2026-10-02
+
+### Keybindings
+- **Fullscreen Note:** Remapped `V` to open the currently selected Note in the Fullscreen Reader (adding a fast explicit alternative to `Enter`).
+- **Release Notes:** Shifted the "What's New" hotkey from `V` to `W`.
+
 ## Version 2.6.5
 **Date:** 2026-10-02
 

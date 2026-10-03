@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.5"
+$AppVersion = "2.6.6"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1413,6 +1413,7 @@ function Start-NotebookBrowser {
         if ($activeItem -and $activeItem.Type -eq "Note") {
             $navItems += @(
                 @("[Enter]", " View "),
+                @("[V]", " Fullscreen "),
                 @("[E]", " Edit "),
                 @("[O]", " Obsidian ")
             )
@@ -1422,15 +1423,15 @@ function Start-NotebookBrowser {
 
         $navItems += @(
             @("[N]", " Note "), @("[F]", " Folder "),
-            @("[V]", " What's New "), @("[R]", " Rename "),
+            @("[W]", " What's New "), @("[R]", " Rename "),
             @("[X]", " Del "), @("[Q]", " Exit")
         )
 
         # Calculate worst-case nav lines to prevent UI bouncing/flickering
         $worstItems = @(
             @("[W/S]", " Move "), @("[A/D]", " Folders "), @("[J/K]", " Scroll "), @("[T]", " Sort "),
-            @("[Enter]", " Expand "), @("[Enter]", " View "), @("[E]", " Edit "), @("[O]", " Obsidian "),
-            @("[N]", " Note "), @("[F]", " Folder "), @("[V]", " What's New "),
+            @("[Enter]", " Expand "), @("[Enter]", " View "), @("[V]", " Fullscreen "), @("[E]", " Edit "), @("[O]", " Obsidian "),
+            @("[N]", " Note "), @("[F]", " Folder "), @("[W]", " What's New "),
             @("[R]", " Rename "), @("[X]", " Del "), @("[Q]", " Exit")
         )
         $worstLen = 1
@@ -1746,6 +1747,11 @@ function Start-NotebookBrowser {
                 }
             }
             "V" {
+                if ($activeItem -and $activeItem.Type -eq "Note") {
+                    Invoke-Modal { View-FullscreenNote (Get-Item $activeItem.FullName) }
+                }
+            }
+            "W" {
                 $releaseNotesPath = Join-Path $PSScriptRoot "RELEASE_NOTES.md"
                 if (Test-Path $releaseNotesPath) {
                     Invoke-Modal { View-FullscreenNote -File (Get-Item $releaseNotesPath) -ReadOnly }
