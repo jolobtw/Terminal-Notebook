@@ -1702,12 +1702,26 @@ function Start-NotebookBrowser {
         }
         [Console]::Write($sb.ToString())
 
-        # Read Keystroke
+        # Responsive Read Keystroke & Resize Polling
         try {
-            $key = [Console]::ReadKey($true)
+            $initialWidth = [Console]::WindowWidth
+            $key = $null
+            while ($true) {
+                if ([Console]::KeyAvailable) {
+                    $key = [Console]::ReadKey($true)
+                    break
+                }
+                if ([Console]::WindowWidth -ne $initialWidth) {
+                    $script:needsFullClear = $true
+                    break
+                }
+                Start-Sleep -Milliseconds 25
+            }
         } catch {
             break
         }
+        
+        if ($null -eq $key) { continue }
 
         switch ($key.Key) {
             { $_ -in @("UpArrow", "W") } {
