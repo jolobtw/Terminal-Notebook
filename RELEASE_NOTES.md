@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.1.3
+**Date:** 2026-10-03
+
+### Visual Polish & Header Layout
+- **Sort Indicator Spacing:** Added visual buffer spacing between the sort indicator and the center divider line in the header banner, creating a cleaner, more balanced separation.
+
 ## Version 3.1.2
 **Date:** 2026-10-03
 

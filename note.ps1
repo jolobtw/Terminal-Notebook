@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.1.2"
+$AppVersion = "3.1.3"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -2186,16 +2186,17 @@ function Start-NotebookBrowser {
                 $sortText = if ($script:SortMode -eq "alpha") { "A-Z" } else { "Date" }
                 $sortBadge = " $sortIcon $sortText "
 
+                $sortBufferLen = 2
                 $availLeft = $leftWidth - 1
-                if ($leftTitle.Length + $sortBadge.Length -gt $availLeft) {
-                    $maxT = $availLeft - $sortBadge.Length - 1
+                if ($leftTitle.Length + $sortBadge.Length + $sortBufferLen -gt $availLeft) {
+                    $maxT = $availLeft - $sortBadge.Length - $sortBufferLen - 1
                     if ($maxT -gt 5) {
                         $leftTitle = Truncate-String -Str $leftTitle -MaxLen $maxT
                     } else {
                         $leftTitle = " NOTES "
                     }
                 }
-                $leftDashes = [Math]::Max(0, $availLeft - $leftTitle.Length - $sortBadge.Length)
+                $leftDashes = [Math]::Max(0, $availLeft - $leftTitle.Length - $sortBadge.Length - $sortBufferLen)
 
                 $scrollNotice = ""
                 if ($previewLines.Count -gt $usableHeight) {
@@ -2216,7 +2217,7 @@ function Start-NotebookBrowser {
                 $topBorderColor = fg $cBorderStart[0] $cBorderStart[1] $cBorderStart[2]
                 $botBorderColor = fg $cBorderEnd[0] $cBorderEnd[1] $cBorderEnd[2]
 
-                [void]$sb.Append($topBorderColor + $uRoundTL + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $leftDashes) + $cAmber + $sortBadge + $topBorderColor + $bTopT + $bHoriz + $cOrange + $rightTitle + $topBorderColor + ($bHoriz * $rightDashes) + $uRoundTR + $rst + "`r`n")
+                [void]$sb.Append($topBorderColor + $uRoundTL + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $leftDashes) + $cAmber + $sortBadge + $topBorderColor + ($bHoriz * $sortBufferLen) + $bTopT + $bHoriz + $cOrange + $rightTitle + $topBorderColor + ($bHoriz * $rightDashes) + $uRoundTR + $rst + "`r`n")
 
                 # 3. Render Rows
                 for ($r = 0; $r -lt $boxHeight; $r++) {
