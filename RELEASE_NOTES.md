@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.0.2
+**Date:** 2026-10-03
+
+### Bug Fixes
+- **Popup Modal Border Clipping & Frame ANSI Corruption:** Resolved issue where background line ANSI parsing caused popup modal cards (`[N]`, `[F]`, `[R]`, `[X]`, `[L]`) to corrupt preview text colors and strip the application's rightmost outer border (`│`, `╮`, `╯`).
+- **Explicit 3-Segment Frame Slicing & Right Border Preservation:** Implemented explicit 3-segment overlay logic (`$leftBg` + `$modalCard` + `$rightPreview` + `$rightBorder`) with exact `Get-PlainSubstring` offset math and automated right border ANSI color extraction (`Get-RightBorderANSI`), ensuring 100% pixel-perfect frame alignment and preserving the outer top-to-bottom border gradient when modals are visible.
+
 ## Version 3.0.1
 **Date:** 2026-10-03
 

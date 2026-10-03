@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.0.1"
+$AppVersion = "3.0.2"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -382,30 +382,39 @@ function Write-ModalHeader {
 }
 
 # --- Inline Floating Popup Modal Engine ---
-function Get-AnsiTail([string]$Text, [int]$StartCol, [int]$TotalWidth) {
-    if ([string]::IsNullOrEmpty($Text)) { return "" }
-    $sb = [System.Text.StringBuilder]::new()
-    $activeAnsi = [System.Text.StringBuilder]::new()
-    $visible = 0
+function Get-PlainSubstring([string]$Text, [int]$StartCol, [int]$Length) {
+    if ([string]::IsNullOrEmpty($Text) -or $Length -le 0) { return "" }
+    $plain = $AnsiRegex.Replace($Text, '')
+    if ($StartCol -ge $plain.Length) { return "" }
+    $actualLen = [Math]::Min($Length, $plain.Length - $StartCol)
+    return $plain.Substring($StartCol, $actualLen)
+}
+
+function Get-RightBorderANSI([string]$Line, [int]$TermWidth) {
+    if ([string]::IsNullOrEmpty($Line)) { return "" }
+    $trimmed = $Line.TrimEnd("`r", "`n")
+    if ($trimmed.EndsWith($rst)) {
+        $trimmed = $trimmed.Substring(0, $trimmed.Length - $rst.Length)
+    }
+    $activeColor = ""
+    $lastChar = ""
     $i = 0
-    while ($i -lt $Text.Length) {
-        $m = $AnsiTokenRegex.Match($Text, $i)
+    while ($i -lt $trimmed.Length) {
+        $m = $AnsiTokenRegex.Match($trimmed, $i)
         if ($m.Success) {
-            if ($visible -lt $StartCol) {
-                [void]$activeAnsi.Append($m.Value)
-            } else {
-                [void]$sb.Append($m.Value)
+            if ($m.Value -ne $rst) {
+                $activeColor = $m.Value
             }
             $i += $m.Length
         } else {
-            if ($visible -ge $StartCol -and $visible -lt $TotalWidth) {
-                [void]$sb.Append($Text[$i])
-            }
-            $visible++
+            $lastChar = $trimmed[$i]
             $i++
         }
     }
-    return $activeAnsi.ToString() + $sb.ToString()
+    if ($lastChar) {
+        return $activeColor + $lastChar + $rst
+    }
+    return ""
 }
 
 function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
@@ -419,11 +428,29 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
     for ($i = 0; $i -lt $FrameLines.Count; $i++) {
         if ($i -ge $topRow -and ($i - $topRow) -lt $mh) {
             $mIdx = $i - $topRow
-            $leftBg = (Limit-AnsiText $FrameLines[$i] $leftCol) + $rst
+            $leftBgRaw = Limit-AnsiText $FrameLines[$i] $leftCol
+            $leftVisLen = ($AnsiRegex.Replace($leftBgRaw, '')).Length
+            if ($leftVisLen -lt $leftCol) {
+                $leftBgRaw += (" " * ($leftCol - $leftVisLen))
+            }
+            $leftBg = $leftBgRaw + $rst
+
             $modalStr = $ModalLines[$mIdx]
             $rightCol = $leftCol + $mw
-            $rightBg = Get-AnsiTail $FrameLines[$i] $rightCol $TermWidth
-            $outLines.Add($leftBg + $modalStr + $rightBg)
+
+            $rightPreviewLen = ($TermWidth - 1) - $rightCol
+            $rightPreview = ""
+            if ($rightPreviewLen -gt 0) {
+                $plainRight = Get-PlainSubstring $FrameLines[$i] $rightCol $rightPreviewLen
+                if ($plainRight.Length -lt $rightPreviewLen) {
+                    $plainRight = $plainRight.PadRight($rightPreviewLen)
+                }
+                $rightPreview = $cSilver + $plainRight + $rst
+            }
+
+            $rightBorder = Get-RightBorderANSI $FrameLines[$i] $TermWidth
+
+            $outLines.Add($leftBg + $modalStr + $rightPreview + $rightBorder)
         } else {
             $outLines.Add($FrameLines[$i])
         }
