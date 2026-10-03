@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.0
+**Date:** 2026-10-03
+
+### Modal Card Aesthetics & Box Geometry
+- **Sharp 90-Degree Box Corners:** Upgraded all inline popup modal cards (`Show-InlineInputModal`, `Show-InlineConfirmModal`, `Show-InlineAlertModal`) from rounded corners (`╭`, `╮`, `╰`, `╯`) to crisp 90-degree box-drawing corners (`┌`, `┐`, `└`, `┘`), seamlessly matching the 90-degree geometry of the main background frame.
+- **Edge-Aligned Width & Layout:** Expanded modal card widths (`$cardW`) to `$termW - 4` (bounded between 54 and 74 characters), stretching the side gradient borders right up close to the backdrop edges for a sleek, cohesive look without awkward floating whitespace.
+
 ## Version 3.2.7
 **Date:** 2026-10-03
 
