@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.6.3"
+$AppVersion = "2.6.4"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -231,7 +231,7 @@ function Render-HeaderBanner($width) {
 
     $barWidth = [Math]::Max(10, $width - 2)
     [void]$sb.AppendLine(" " + (Render-AuroraWave $barWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2584)))
-    return $sb.ToString().TrimEnd()
+    return $sb.ToString().TrimEnd() + "`r`n"
 }
 
 function Open-InObsidian {

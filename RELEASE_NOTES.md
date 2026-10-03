@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.4
+**Date:** 2026-10-02
+
+### UI Tweaks
+- **Header Spacing:** Added an empty line buffer beneath the main application header banner to prevent the sleek accent line from feeling too cramped against the UI elements below it.
+
 ## Version 2.6.3
 **Date:** 2026-10-02
 
