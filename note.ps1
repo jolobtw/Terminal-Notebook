@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.5.1"
+$AppVersion = "2.5.2"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1119,11 +1119,12 @@ function View-FullscreenNote {
     )
     if (-not $File -or -not (Test-Path $File.FullName)) { return }
 
-    $termW = 80
+    $termWidth = 100
     try {
-        if ([Console]::WindowWidth -gt 20) { $termW = [Console]::WindowWidth - 2 }
+        if ([Console]::WindowWidth -gt 50) { $termWidth = [Console]::WindowWidth }
     } catch {}
 
+    $termW = [Math]::Max(20, $termWidth - 2)
     $borderLine = "=" * [Math]::Min(120, $termW)
     $divLine    = "-" * [Math]::Min(120, $termW)
 
@@ -1134,17 +1135,17 @@ function View-FullscreenNote {
     $scrollOffset = 0
 
     while ($true) {
-        $termH = 24
+        $termHeight = 26
         try {
-            if ([Console]::WindowHeight -gt 10) { $termH = [Console]::WindowHeight }
+            if ([Console]::WindowHeight -gt 15) { $termHeight = [Console]::WindowHeight }
         } catch {}
         
-        $viewHeight = [Math]::Max(5, $termH - 13)
+        $viewHeight = [Math]::Max(5, $termHeight - 13)
         $maxScroll = [Math]::Max(0, $renderedLines.Count - $viewHeight)
         if ($scrollOffset -gt $maxScroll) { $scrollOffset = $maxScroll }
 
         Clear-Host
-        Write-Host (Render-HeaderBanner $termW)
+        Write-Host (Render-HeaderBanner $termWidth)
         Write-Host ""
         Write-Host $borderLine -ForegroundColor DarkGray
         $modeTag = if ($ReadOnly) { $cGray + " [Read-Only]" } else { "" }

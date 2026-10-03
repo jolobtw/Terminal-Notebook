@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.5.2
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Fullscreen Header Alignment:** Fixed a bug where entering the Fullscreen Reader caused the "TERMINAL NOTEBOOK" header text to subtly shift to the left. The Fullscreen Reader now calculates its viewport width identically to the main browser view, ensuring the top banner remains perfectly static and pixel-aligned across all views.
+
 ## Version 2.5.1
 **Date:** 2026-10-02
 
