@@ -1,8 +1,8 @@
-# Terminal Notes
+# Terminal Notebook
 
 A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing, and organizing Markdown notes. It bridges the speed and workflow of the command line with the rich formatting and organizational power of modern note-taking apps like Obsidian.
 
-![Terminal Notes Main UI](docs/main-ui.png)
+![Terminal Notebook Main UI](docs/main-ui.png)
 
 
 ## 🌟 Key Features
@@ -47,7 +47,7 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 2. Open your PowerShell profile (`notepad $PROFILE`).
 3. Add the following alias so you can launch the app from anywhere:
    ```powershell
-   Set-Alias -Name note -Value "C:\path\to\TerminalNotes\note.ps1"
+   Set-Alias -Name note -Value "C:\path\to\TerminalNotebook\note.ps1"
    ```
 
 ---
@@ -70,5 +70,6 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 | `U` | View App Updates / Release Notes |
 | `T` | Toggle Sorting (A-Z vs Date Modified) |
 | `Q` or `Esc` | Exit |
+
 
 

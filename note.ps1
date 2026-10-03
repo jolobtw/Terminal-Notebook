@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Terminal Notes & Notebook Browser with Folder & Nerd Font Support
+    Terminal Notebook Browser with Folder & Nerd Font Support
 .DESCRIPTION
     A terminal-based notebook for browsing, writing, and organizing Markdown notes.
     Features collapsible folder hierarchy, Nerd Font icons, and Obsidian integration.
@@ -304,7 +304,7 @@ function Invoke-TerminalEditor {
         # which would cause catastrophic line wrapping as the window shrinks!
         Start-Sleep -Milliseconds 800
         
-        # Return instantly. The left pane (TerminalNotes) stays fully interactive while the right pane edits!
+        # Return instantly. The left pane (Terminal Notebook) stays fully interactive while the right pane edits!
         return
     }
 
@@ -1957,7 +1957,7 @@ if (-not [string]::IsNullOrWhiteSpace($Command)) {
             return
         }
         "help" {
-            Write-Host "Terminal Notes & Notebook Usage:" -ForegroundColor Cyan
+            Write-Host "Terminal Notebook Usage:" -ForegroundColor Cyan
             Write-Host "  note                      Open Notebook Browser (interactive tree view)"
             Write-Host "  note `"quick thought`"      Instantly append a thought to today's log"
             Write-Host "  note new [title]          Create a new markdown note"
@@ -1979,3 +1979,4 @@ if (-not [string]::IsNullOrWhiteSpace($Command)) {
 
 # Default action when typing `note` or `notes`: Open the Notebook Browser!
 Start-NotebookBrowser
+

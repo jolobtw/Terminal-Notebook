@@ -1,4 +1,4 @@
-# Terminal Notes Release Notes
+# Terminal Notebook Release Notes
 
 ## Version 2.6.10
 **Date:** 2026-10-02
@@ -67,7 +67,7 @@
 **Date:** 2026-10-02
 
 ### Features & Tweaks
-- **Helix Editor Support:** Replaced `micro` as the primary default terminal editor with the much faster and modern `hx` (Helix). The editor is fully integrated and instantly launches with soft-wrapping enabled, alongside a custom `.toml` colorscheme that perfectly perfectly mirrors the Terminal Notes UI for completely seamless side-by-side editing.
+- **Helix Editor Support:** Replaced `micro` as the primary default terminal editor with the much faster and modern `hx` (Helix). The editor is fully integrated and instantly launches with soft-wrapping enabled, alongside a custom `.toml` colorscheme that perfectly perfectly mirrors the Terminal Notebook UI for completely seamless side-by-side editing.
 
 ## Version 2.5.3
 **Date:** 2026-10-02
@@ -194,7 +194,7 @@ vim) opens natively on the right. When you exit your editor, the split-pane vani
 **Date:** 2026-10-02
 
 ### Bug Fixes
-- **Electron Log Bleed:** Fixed an issue where the Obsidian Electron app would inherit the terminal's standard output handles and dump its startup logs (e.g., auto-updater checks) directly into the Terminal Notes interface. We now explicitly use System.Diagnostics.ProcessStartInfo with ShellExecute to enforce complete background detachment.
+- **Electron Log Bleed:** Fixed an issue where the Obsidian Electron app would inherit the terminal's standard output handles and dump its startup logs (e.g., auto-updater checks) directly into the Terminal Notebook interface. We now explicitly use System.Diagnostics.ProcessStartInfo with ShellExecute to enforce complete background detachment.
 
 ## Version 1.6
 **Date:** 2026-10-02
@@ -243,5 +243,6 @@ vim) opens natively on the right. When you exit your editor, the split-pane vani
 - **Obsidian Integration:** Launch and edit notes directly inside Obsidian or preferred terminal editors (`micro`, `nvim`, `nano`).
 - **Quick Logging:** Rapid text entry mode directly inside the terminal without needing to boot up a full editor.
 - **Flicker-Free Rendering:** Optimized double-buffered screen rendering to prevent UI flashing during navigation.
+
 
 
