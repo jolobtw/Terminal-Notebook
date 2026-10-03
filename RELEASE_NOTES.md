@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.1.0
+**Date:** 2026-10-03
+
+### Visual Polish & Header Cleanliness
+- **Sleek Header Banner:** Simplified the main top title banner to cleanly display `T E R M I N A L   N O T E B O O K`, giving the application a minimalist, high-end appearance.
+- **Subtle Version Indicator:** Moved the version display to the bottom navigation bar legend alongside the Updates shortcut (`[U] Updates (v3.1.0)`), keeping version details easy to find without cluttering the top of the interface.
+
 ## Version 3.0.5
 **Date:** 2026-10-03
 

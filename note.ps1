@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.0.5"
+$AppVersion = "3.1.0"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -734,7 +734,7 @@ function Register-ObsidianVault {
 function Render-HeaderBanner([int]$width) {
     if (-not $script:BannerCache.ContainsKey($width)) {
         $sb = New-Object System.Text.StringBuilder
-        $titleText = " T E R M I N A L   N O T E B O O K   v$AppVersion "
+        $titleText = " T E R M I N A L   N O T E B O O K "
         $pad = " " * [Math]::Max(0, [int](($width - $titleText.Length) / 2))
         [void]$sb.AppendLine($pad + (Render-GradientText $titleText $gWaveOrange $gWaveAmber))
 
@@ -859,7 +859,7 @@ $NavSpec = @(
     @{ Key = "[O]";     Label = " Obsidian ";   When = "Note" },
     @{ Key = "[N]";     Label = " Note " },
     @{ Key = "[F]";     Label = " Folder " },
-    @{ Key = "[U]";     Label = " Updates " },
+    @{ Key = "[U]";     Label = " Updates (v$AppVersion) " },
     @{ Key = "[R]";     Label = " Rename " },
     @{ Key = "[X]";     Label = " Del " },
     @{ Key = "[Q]";     Label = " Exit" }
