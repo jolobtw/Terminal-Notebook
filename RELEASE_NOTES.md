@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.3
+**Date:** 2026-10-03
+
+### Documentation & UI Showcase
+- **Updated UI Showcase Screenshots:** Refreshed `docs/main-ui.png` and `docs/fullscreen-reader.png` with the latest aesthetic upgrades.
+- **Floating Modal Showcase:** Added `docs/pop-up.png` to `README.md` under the *Inline Floating Modals* section, visually demonstrating popup dialog cards over dimmed TUI backdrops.
+
 ## Version 3.3.2
 **Date:** 2026-10-03
 
