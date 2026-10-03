@@ -133,3 +133,9 @@ vim) opens natively on the right. When you exit your editor, the split-pane vani
 
 ### Bug Fixes
 - **Editor Cursor Placement:** Fixed an annoying bug where opening an existing note in a terminal editor (`micro`, `vim`, `nano`) would place the cursor on the last line containing text (the "last line -1"), rather than on the empty trailing newline. The script now parses the file natively, perfectly preserving trailing newlines and dropping your cursor at the absolute bottom of the file every time.
+
+## Version 2.2.0
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **UI Consistency:** Applied the sleek, rounded gradient borders (previously only seen on the Folder Telemetry card) to all bordered elements throughout the note viewer! This includes Properties blocks, Fenced Code blocks, Markdown Tables, Blockquotes, and Horizontal Rules. The `Flame Orange -> Graphite` gradient now themes the entire application for a perfectly unified aesthetic.

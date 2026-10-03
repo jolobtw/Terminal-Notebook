@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.1.1"
+$AppVersion = "2.2.0"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -459,29 +459,37 @@ function Convert-MarkdownToTerminalLines {
 
         if ($frontmatterLines.Count -gt 0) {
             $titleStr = " Properties "
-            $dashes = [Math]::Max(2, $Width - 17)
-            $out += ($cDarkGray + " " + $uRoundTL + $uHoriz + $cOrange + $titleStr + $cDarkGray + ($uHoriz * $dashes) + $uRoundTR + $rst)
+            $boxW = [Math]::Max(20, $Width - 2)
+            $dashesLeft = 1
+            $dashesRight = [Math]::Max(2, $boxW - $titleStr.Length - $dashesLeft - 2)
+            $topBorderStr = $uRoundTL + ($uHoriz * $dashesLeft) + $titleStr + ($uHoriz * $dashesRight) + $uRoundTR
+            $out += " " + (Render-GradientText $topBorderStr $gWaveOrange $gWaveDark)
+
+            $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
+            $rightBar = Render-GradientText $uVert $gWaveDark $gWaveOrange
+
             foreach ($fl in $frontmatterLines) {
                 if ($fl -match '^\s*([A-Za-z0-9_-]+)\s*:\s*(.*)') {
                     $key = $matches[1]
                     $val = $matches[2].Trim('"', "'", ' ')
                     $valDisp = if ($val) { $val } else { "" }
-                    if ($valDisp.Length -gt ($Width - 16)) { $valDisp = $valDisp.Substring(0, $Width - 19) + "..." }
+                    if ($valDisp.Length -gt ($boxW - 14)) { $valDisp = $valDisp.Substring(0, $boxW - 17) + "..." }
                     $keyPad = "{0,-8}" -f $key
-                    $contentLen = 13 + $valDisp.Length
-                    $padLen = [Math]::Max(0, $Width - 2 - $contentLen)
+                    $contentLen = 11 + $valDisp.Length
+                    $padLen = [Math]::Max(0, $boxW - 2 - $contentLen)
                     $pad = " " * $padLen
-                    $out += ($cDarkGray + " " + $uVert + " " + $cGray + $keyPad + $cDarkGray + ": " + $cWhite + (Format-MarkdownInline $valDisp) + $pad + $cDarkGray + $uVert + $rst)
+                    $out += " " + $leftBar + " " + $cGray + $keyPad + $cDarkGray + ": " + $cWhite + (Format-MarkdownInline $valDisp) + $pad + $rightBar
                 } elseif ($fl -match '^\s*-\s+(.*)') {
                     $itemText = $matches[1]
-                    if ($itemText.Length -gt ($Width - 13)) { $itemText = $itemText.Substring(0, $Width - 16) + "..." }
-                    $contentLen = 7 + $itemText.Length
-                    $padLen = [Math]::Max(0, $Width - 2 - $contentLen)
+                    if ($itemText.Length -gt ($boxW - 11)) { $itemText = $itemText.Substring(0, $boxW - 14) + "..." }
+                    $contentLen = 5 + $itemText.Length
+                    $padLen = [Math]::Max(0, $boxW - 2 - $contentLen)
                     $pad = " " * $padLen
-                    $out += ($cDarkGray + " " + $uVert + "   " + $cAmber + "$uBullet " + $cSilver + (Format-MarkdownInline $itemText) + $pad + $cDarkGray + $uVert + $rst)
+                    $out += " " + $leftBar + "   " + $cAmber + "$uBullet " + $cSilver + (Format-MarkdownInline $itemText) + $pad + $rightBar
                 }
             }
-            $out += ($cDarkGray + " " + $uRoundBL + ($uHoriz * [Math]::Max(2, $Width - 4)) + $uRoundBR + $rst)
+            $botBorderStr = $uRoundBL + ($uHoriz * ($boxW - 2)) + $uRoundBR
+            $out += " " + (Render-GradientText $botBorderStr $gWaveOrange $gWaveDark)
             $out += ""
         }
     }
@@ -494,28 +502,35 @@ function Convert-MarkdownToTerminalLines {
 
         # Fenced Code Blocks (```powershell)
         if ($line -match '^\s*```([A-Za-z0-9_-]*)') {
+            $boxW = [Math]::Max(20, $Width - 2)
             if (-not $inCodeBlock) {
                 $inCodeBlock = $true
                 $codeLang = $matches[1]
                 $tag = if ($codeLang) { " $codeLang " } else { " Code " }
-                $dashes = [Math]::Max(2, $Width - 5 - $tag.Length)
-                $out += ($cDarkGray + " " + $uRoundTL + $uHoriz + $cOrange + $tag + $cDarkGray + ($uHoriz * $dashes) + $uRoundTR + $rst)
+                $dashesLeft = 1
+                $dashesRight = [Math]::Max(2, $boxW - $tag.Length - $dashesLeft - 2)
+                $topBorderStr = $uRoundTL + ($uHoriz * $dashesLeft) + $tag + ($uHoriz * $dashesRight) + $uRoundTR
+                $out += " " + (Render-GradientText $topBorderStr $gWaveOrange $gWaveDark)
             } else {
                 $inCodeBlock = $false
-                $out += ($cDarkGray + " " + $uRoundBL + ($uHoriz * [Math]::Max(2, $Width - 4)) + $uRoundBR + $rst)
+                $botBorderStr = $uRoundBL + ($uHoriz * ($boxW - 2)) + $uRoundBR
+                $out += " " + (Render-GradientText $botBorderStr $gWaveOrange $gWaveDark)
             }
             continue
         }
 
         if ($inCodeBlock) {
+            $boxW = [Math]::Max(20, $Width - 2)
+            $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
+            $rightBar = Render-GradientText $uVert $gWaveDark $gWaveOrange
             $codeStr = $line
-            if ($codeStr.Length -gt ($Width - 6)) {
-                $codeStr = $codeStr.Substring(0, $Width - 6)
+            if ($codeStr.Length -gt ($boxW - 4)) {
+                $codeStr = $codeStr.Substring(0, $boxW - 4)
             }
-            $contentLen = 3 + $codeStr.Length
-            $padLen = [Math]::Max(0, $Width - 2 - $contentLen)
+            $contentLen = 2 + $codeStr.Length
+            $padLen = [Math]::Max(0, $boxW - 2 - $contentLen)
             $pad = " " * $padLen
-            $out += ($cDarkGray + " " + $uVert + " " + $cAmber + $codeStr + $pad + $cDarkGray + $uVert + $rst)
+            $out += " " + $leftBar + " " + $cAmber + $codeStr + $pad + " " + $rightBar
             continue
         }
 
@@ -552,8 +567,9 @@ function Convert-MarkdownToTerminalLines {
         if ($line -match '^\s*>\s*(.*)') {
             $qBody = $matches[1]
             $wrapped = @(Format-WordWrap -Text $qBody -Width ($Width - 5))
+            $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
             foreach ($wb in $wrapped) {
-                $out += (" " + $cDarkGray + "$uVert " + $sItalic + $cSilver + (Format-MarkdownInline $wb) + $sNoItalic + $rst)
+                $out += (" " + $leftBar + " " + $sItalic + $cSilver + (Format-MarkdownInline $wb) + $sNoItalic + $rst)
             }
             continue
         }
@@ -589,7 +605,7 @@ function Convert-MarkdownToTerminalLines {
             if ($out.Count -gt 0 -and -not [string]::IsNullOrEmpty($out[-1])) { $out += "" }
             $out += (" " + $cOrange + "# " + $cWhite + $sBold + (Format-MarkdownInline $hText) + $sNoBold + $rst)
             $divLen = [Math]::Min($Width - 2, [Math]::Max(12, $hText.Length + 4))
-            $out += (" " + $cDarkGray + ($uHoriz * $divLen) + $rst)
+            $out += " " + (Render-GradientText ($uHoriz * $divLen) $gWaveOrange $gWaveDark)
             continue
         }
         if ($line -match '^##\s+(.*)') {
@@ -613,18 +629,23 @@ function Convert-MarkdownToTerminalLines {
         # Markdown Tables: | Col1 | Col2 |
         if ($line -match '^\s*\|(.+)\|\s*$') {
             $inner = $matches[1]
+            $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
+            $rightBar = Render-GradientText $uVert $gWaveDark $gWaveOrange
             if ($inner -match '^[\s\-:|]+$') {
-                $out += ($cDarkGray + " " + $uMidLeft + ($uHoriz * [Math]::Min($Width - 4, 45)) + $uMidRight + $rst)
+                $midLen = [Math]::Min($Width - 4, 45)
+                $midStr = $uMidLeft + ($uHoriz * $midLen) + $uMidRight
+                $out += " " + (Render-GradientText $midStr $gWaveOrange $gWaveDark)
             } else {
                 $cells = $inner -split '\|' | ForEach-Object { (Format-MarkdownInline $_.Trim()) }
-                $out += ($cDarkGray + " " + $uVert + " " + ($cells -join ($cDarkGray + " " + $uVert + " " + $rst)) + " " + $cDarkGray + $uVert + $rst)
+                $out += " " + $leftBar + " " + ($cells -join (" " + $leftBar + " ")) + " " + $rightBar
             }
             continue
         }
 
         # Horizontal Rules
         if ($line -match '^(---|\*\*\*|___)\s*$') {
-            $out += (" " + $cDarkGray + ($uHoriz * [Math]::Min(50, $Width - 2)) + $rst)
+            $hrLen = [Math]::Min(50, $Width - 2)
+            $out += " " + (Render-GradientText ($uHoriz * $hrLen) $gWaveOrange $gWaveDark)
             continue
         }
 
