@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 2.9.0
+**Date:** 2026-10-03
+
+### Keybindings & Features
+- **Expand / Collapse All Folders Hotkey:** Added **`[C]`** (and `Shift+A` / `Shift+D`) to instantly expand or collapse all folders in the navigation tree at once.
+- **Nav Spec Legend Update:** Added `[C] All Folders` to the interactive bottom navigation bar legend.
+
 ## Version 2.8.0
 **Date:** 2026-10-03
 

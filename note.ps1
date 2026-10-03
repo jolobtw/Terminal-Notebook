@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "2.8.0"
+$AppVersion = "2.9.0"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1586,6 +1586,7 @@ function Search-NotesPrompt {
 $NavSpec = @(
     @{ Key = "[W/S]";   Label = " Move " },
     @{ Key = "[A/D]";   Label = " Folders " },
+    @{ Key = "[C]";     Label = " All Folders " },
     @{ Key = "[J/K]";   Label = " Scroll ";     When = "Scroll" },
     @{ Key = "[T]";     Label = " Sort " },
     @{ Key = "[Enter]"; Label = " Expand ";     When = "Folder" },
@@ -1648,6 +1649,18 @@ function Start-NotebookBrowser {
             return (Get-Item -LiteralPath $activeItem.FullName)
         }
         return $null
+    }
+
+    function Expand-AllFolders {
+        $script:CollapsedFolders.Clear()
+        $itemsDirty = $true
+    }
+
+    function Collapse-AllFolders {
+        foreach ($d in (Get-NoteFolders)) {
+            $script:CollapsedFolders[$d.FullName] = $true
+        }
+        $itemsDirty = $true
     }
 
     $selectedIndex = 0
@@ -1958,14 +1971,33 @@ function Start-NotebookBrowser {
                         $previewScrollOffset = [Math]::Max(0, $previewScrollOffset - 3)
                     }
                 }
+                "C" {
+                    $hasShift = ($key.Modifiers -band [System.ConsoleModifiers]::Shift)
+                    if ($hasShift) {
+                        Expand-AllFolders
+                    } else {
+                        $allFolders = @(Get-NoteFolders)
+                        if ($script:CollapsedFolders.Count -ge $allFolders.Count -and $allFolders.Count -gt 0) {
+                            Expand-AllFolders
+                        } else {
+                            Collapse-AllFolders
+                        }
+                    }
+                }
                 { $_ -in @("RightArrow", "D") } {
-                    if ($activeItem -and $activeItem.Type -eq "Folder" -and -not $activeItem.IsExpanded) {
+                    $hasShift = ($key.Modifiers -band [System.ConsoleModifiers]::Shift)
+                    if ($hasShift) {
+                        Expand-AllFolders
+                    } elseif ($activeItem -and $activeItem.Type -eq "Folder" -and -not $activeItem.IsExpanded) {
                         $script:CollapsedFolders.Remove($activeItem.FullName)
                         $itemsDirty = $true
                     }
                 }
                 { $_ -in @("LeftArrow", "A") } {
-                    if ($activeItem) {
+                    $hasShift = ($key.Modifiers -band [System.ConsoleModifiers]::Shift)
+                    if ($hasShift) {
+                        Collapse-AllFolders
+                    } elseif ($activeItem) {
                         if ($activeItem.Type -eq "Folder" -and $activeItem.IsExpanded) {
                             $script:CollapsedFolders[$activeItem.FullName] = $true
                             $itemsDirty = $true

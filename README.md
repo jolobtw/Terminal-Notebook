@@ -81,7 +81,8 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 | Key | Action |
 |-----|--------|
 | `W/S` or `Up/Dn` | Move selection up or down |
-| `A/D` or `L/R` | Expand or collapse folders |
+| `A/D` or `L/R` | Expand or collapse selected folder |
+| `C` or `Shift+A/D` | Expand or collapse ALL folders |
 | `J/K` or `PgUp/PgDn` | Scroll through long file previews |
 | `Enter` | Expand Folders |
 | `V` | Open Note in Fullscreen Reader |
