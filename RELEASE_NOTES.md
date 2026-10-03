@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.5.3
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Split-Pane UI Jumbling:** Fixed a critical regression where opening the seamless split-pane editor (e.g., pressing `[N]` or `[E]` in Windows Terminal) caused the left-hand Notebook Browser to become completely jumbled. The UI layout engine previously ignored any terminal width smaller than 50 columns. When the pane split in half (often resulting in ~45-49 columns), the app forcefully rendered the UI at 100 columns, causing catastrophic text wrapping. The minimum width constraints have been drastically relaxed to cleanly support extremely narrow terminal panes.
+
 ## Version 2.5.2
 **Date:** 2026-10-02
 

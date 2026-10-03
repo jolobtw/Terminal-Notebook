@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.5.2"
+$AppVersion = "2.5.3"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1287,14 +1287,20 @@ function Start-NotebookBrowser {
         $termWidth = 100
         $termHeight = 26
         try {
-            if ([Console]::WindowWidth -gt 50) { $termWidth = [Console]::WindowWidth }
-            if ([Console]::WindowHeight -gt 15) { $termHeight = [Console]::WindowHeight }
+            if ([Console]::WindowWidth -gt 20) { $termWidth = [Console]::WindowWidth }
+            if ([Console]::WindowHeight -gt 10) { $termHeight = [Console]::WindowHeight }
         } catch {}
 
         # Geometry calculations (Total box width = termWidth = 1 + leftWidth + 1 + rightWidth + 1)
-        $leftWidth = [Math]::Max(30, [Math]::Min(38, [Math]::Floor($termWidth * 0.35)))
+        $leftWidth = [Math]::Max(15, [Math]::Min(38, [Math]::Floor($termWidth * 0.35)))
         $rightWidth = $termWidth - $leftWidth - 3
-        if ($rightWidth -lt 25) { $rightWidth = 25 }
+        
+        if ($rightWidth -lt 25) {
+            $rightWidth = 25
+            $leftWidth = $termWidth - $rightWidth - 3
+            if ($leftWidth -lt 5) { $leftWidth = 5 }
+        }
+        
         $usableWidth = [Math]::Max(20, $rightWidth - 3)
 
         # Active item preview content
