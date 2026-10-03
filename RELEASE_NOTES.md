@@ -1,12 +1,5 @@
 # Terminal Notebook Release Notes
 
-## Version 3.4.0
-**Date:** 2026-10-03
-
-### Contiguous Top-Cap Frame Architecture
-- **Integrated Header Banner:** Fully incorporated the `T E R M I N A L   N O T E B O O K` gradient header banner into the main outer box frame across both the **Notebook Browser** and **Fullscreen Reader** views.
-- **Unified 90-Degree Box Enclosure:** Replaced floating top banner lines with a contiguous top-cap box structure (`┌`, `┐`, `├`, `┤`), uniting the app title, workspace badges, preview headers, reader viewports, and version footer inside a single architectural frame.
-
 ## Version 3.3.1
 **Date:** 2026-10-03
 
