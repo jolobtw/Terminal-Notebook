@@ -1,5 +1,17 @@
 # Terminal Notebook Release Notes
 
+## Version 2.9.1
+**Date:** 2026-10-03
+
+### Bug Fixes
+- **Expand / Collapse All Responsiveness:** Fixed PowerShell variable scoping issue in `Expand-AllFolders` and `Collapse-AllFolders` where `$itemsDirty` state mutation was confined to local helper scope, ensuring immediate view re-renders upon toggling all folders.
+- **Action Legend Text Jumbling:** Applied ANSI Erase-in-Line (`$esc[K`) across all pane line writes, eliminating persistent ghosting/jumbling of legacy action items when moving between tree elements with different action counts.
+
+### UI Polish
+- **Header & Title Styling:** Standardized pane titles (`WORKSPACE: <Name>` and `Preview`) in Flame Orange with consistent spacing and top margin buffer.
+- **Preview Pane Header:** Simplified preview title display to always cleanly show `Preview` without embedding long file names in the header border.
+- **Folder Telemetry Label:** Fixed casing of the telemetry section header to `Folder Telemetry`.
+
 ## Version 2.9.0
 **Date:** 2026-10-03
 
