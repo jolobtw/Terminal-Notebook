@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.0.0"
+$AppVersion = "3.0.1"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -385,12 +385,17 @@ function Write-ModalHeader {
 function Get-AnsiTail([string]$Text, [int]$StartCol, [int]$TotalWidth) {
     if ([string]::IsNullOrEmpty($Text)) { return "" }
     $sb = [System.Text.StringBuilder]::new()
+    $activeAnsi = [System.Text.StringBuilder]::new()
     $visible = 0
     $i = 0
     while ($i -lt $Text.Length) {
         $m = $AnsiTokenRegex.Match($Text, $i)
         if ($m.Success) {
-            if ($visible -ge $StartCol) { [void]$sb.Append($m.Value) }
+            if ($visible -lt $StartCol) {
+                [void]$activeAnsi.Append($m.Value)
+            } else {
+                [void]$sb.Append($m.Value)
+            }
             $i += $m.Length
         } else {
             if ($visible -ge $StartCol -and $visible -lt $TotalWidth) {
@@ -400,7 +405,7 @@ function Get-AnsiTail([string]$Text, [int]$StartCol, [int]$TotalWidth) {
             $i++
         }
     }
-    return $sb.ToString()
+    return $activeAnsi.ToString() + $sb.ToString()
 }
 
 function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
@@ -414,7 +419,7 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
     for ($i = 0; $i -lt $FrameLines.Count; $i++) {
         if ($i -ge $topRow -and ($i - $topRow) -lt $mh) {
             $mIdx = $i - $topRow
-            $leftBg = Limit-AnsiText $FrameLines[$i] $leftCol
+            $leftBg = (Limit-AnsiText $FrameLines[$i] $leftCol) + $rst
             $modalStr = $ModalLines[$mIdx]
             $rightCol = $leftCol + $mw
             $rightBg = Get-AnsiTail $FrameLines[$i] $rightCol $TermWidth
@@ -446,7 +451,7 @@ function Show-InlineInputModal {
         try { if ([Console]::WindowWidth -gt 20) { $termW = [Console]::WindowWidth - 1 } } catch {}
 
         $cardW = [Math]::Min(60, [Math]::Max(44, $termW - 10))
-        $innerW = $cardW - 8
+        $innerW = $cardW - 10
 
         $subDisp = Truncate-String -Str $Subtitle -MaxLen ($cardW - 4)
 
@@ -475,20 +480,20 @@ function Show-InlineInputModal {
         $lblPad = " " * [Math]::Max(0, $cardW - 4 - $lblDisp.Length)
         $modalLines.Add($cardVBar + " " + $cWhite + $sBold + $lblDisp + $sNoBold + $lblPad + " " + $cardVBar)
 
-        $modalLines.Add($cardVBar + "   " + $cDarkGray + $uRoundTL + ($bHoriz * $innerW) + $uRoundTR + $cDarkGray + "   " + $cardVBar)
+        $modalLines.Add($cardVBar + "  " + $cDarkGray + $uRoundTL + ($bHoriz * ($innerW + 2)) + $uRoundTR + $cDarkGray + "  " + $cardVBar)
 
         $inputText = $dispInput + "$cOrange_$rst"
         $inputVisibleLen = $dispInput.Length + 1
         $inputPad = " " * [Math]::Max(0, $innerW - $inputVisibleLen)
-        $modalLines.Add($cardVBar + "   " + $cDarkGray + $bVert + " " + $cWhite + $inputText + $inputPad + $cDarkGray + " " + $bVert + "   " + $cardVBar)
+        $modalLines.Add($cardVBar + "  " + $cDarkGray + $bVert + " " + $cWhite + $inputText + $inputPad + " " + $bVert + $cDarkGray + "  " + $cardVBar)
 
-        $modalLines.Add($cardVBar + "   " + $cDarkGray + $uRoundBL + ($bHoriz * $innerW) + $uRoundBR + $cDarkGray + "   " + $cardVBar)
+        $modalLines.Add($cardVBar + "  " + $cDarkGray + $uRoundBL + ($bHoriz * ($innerW + 2)) + $uRoundBR + $cDarkGray + "  " + $cardVBar)
 
         $modalLines.Add($cardVBar + (" " * ($cardW - 2)) + $cardVBar)
 
         $footerKeys = "$cAmber[Enter]$cSilver $ConfirmActionLabel   $cAmber[Esc]$cSilver Cancel"
         $footerVisibleLen = 8 + $ConfirmActionLabel.Length + 11
-        $footDashRight = [Math]::Max(2, $cardW - 5 - $footerVisibleLen)
+        $footDashRight = [Math]::Max(2, $cardW - 6 - $footerVisibleLen)
         $modalLines.Add($botBorderColor + $uRoundBL + ($bHoriz * 2) + " " + $footerKeys + " " + $botBorderColor + ($bHoriz * $footDashRight) + $uRoundBR + $rst)
 
         $compositeFrame = Overlay-ModalOnFrame -FrameLines $bgLines -ModalLines $modalLines -TermWidth $termW
@@ -571,7 +576,7 @@ function Show-InlineConfirmModal {
 
         $footerKeys = "$cWarn[Y]$cSilver $ConfirmLabel   $cAmber[Esc/N]$cSilver Cancel"
         $footerVisibleLen = 4 + $ConfirmLabel.Length + 15
-        $footDashRight = [Math]::Max(2, $cardW - 5 - $footerVisibleLen)
+        $footDashRight = [Math]::Max(2, $cardW - 6 - $footerVisibleLen)
         $modalLines.Add($botBorderColor + $uRoundBL + ($bHoriz * 2) + " " + $footerKeys + " " + $botBorderColor + ($bHoriz * $footDashRight) + $uRoundBR + $rst)
 
         $compositeFrame = Overlay-ModalOnFrame -FrameLines $bgLines -ModalLines $modalLines -TermWidth $termW

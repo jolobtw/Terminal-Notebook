@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.0.1
+**Date:** 2026-10-03
+
+### Bug Fixes
+- **Inline Popup Border Alignment & Right-Side Clipping:** Resolved an issue where input box and footer card rows in popup modals were calculating width as `$cardW + 2`, causing the right vertical border of the popup to stick out and be clipped by the frame overlay.
+- **Background Frame ANSI Color Preservation:** Updated `Get-AnsiTail` to capture active ANSI color state up to the modal overlay column, restoring full color styling to the right pane and outer app borders while modals are displayed.
+
 ## Version 3.0.0
 **Date:** 2026-10-03
 
