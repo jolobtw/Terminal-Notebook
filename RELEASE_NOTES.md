@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.2.1
+**Date:** 2026-10-03
+
+### Bug Fixes & Tree Alignment
+- **Tree Line Centering & Tight Alignment:** Fixed connecting tree line alignment by standardizing to a 2-character step size (`│ ` and `├─`). Vertical and branch tree lines (`├──`, `└──`, `│`) now center perfectly directly underneath parent expand/collapse arrows (`▼`/`▶`) without any rightward drift.
+
 ## Version 3.2.0
 **Date:** 2026-10-03
 

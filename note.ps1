@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.2.0"
+$AppVersion = "3.2.1"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -2305,14 +2305,14 @@ function Start-NotebookBrowser {
                             if ($cur.AncestorsHasNext -and $cur.AncestorsHasNext.Count -gt 0) {
                                 for ($a = 0; $a -lt $cur.AncestorsHasNext.Count; $a++) {
                                     if ($cur.AncestorsHasNext[$a]) {
-                                        $treePrefix += "$bVert  "
+                                        $treePrefix += "$bVert "
                                     } else {
-                                        $treePrefix += "   "
+                                        $treePrefix += "  "
                                     }
                                 }
                             }
                             $branchGlyph = if ($cur.IsLastSibling) { $gBranchEnd } else { $gBranchMid }
-                            $treePrefix += "$branchGlyph "
+                            $treePrefix += $branchGlyph
                         }
 
                         if ($cur.Type -eq "Folder") {
@@ -2324,7 +2324,7 @@ function Start-NotebookBrowser {
                             $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
                             $leftStr = "$treePrefix$arrow$icon$dispName$countLabel"
                         } elseif ($cur.Type -eq "Note") {
-                            $maxNameLen = [Math]::Max(1, $leftWidth - $treePrefix.Length - 3)
+                            $maxNameLen = [Math]::Max(1, $leftWidth - $treePrefix.Length - 2)
                             $dispName = Truncate-String -Str $cur.Name -MaxLen $maxNameLen
                             $leftStr = "$treePrefix$gFileIcon $dispName"
                         }
