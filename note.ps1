@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.1"
+$AppVersion = "3.3.2"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1532,14 +1532,12 @@ function Get-FolderPreviewLines {
     # Reverse gradient: Orange to DarkGray
     $lines.Add((New-BoxTop " Folder Telemetry " $telemetryWidth))
 
-    $statusStr = if ($Item.IsExpanded) { "Open [v]" } else { "Closed [>]" }
     $noteCountStr = if ($Item.ItemCount -gt 0) { "$($Item.ItemCount) note(s)" } else { "0 notes (empty)" }
     $relPath = Get-RelativeNotePath $Item.FullName
     if ([string]::IsNullOrEmpty($relPath)) { $relPath = "/" }
 
     $rows = @(
         @("Folder",   (Truncate-String $Item.Name ($telemetryWidth - 15)),                $cWhite),
-        @("Status",   $statusStr,                                                         $cOrange),
         @("Contents", $noteCountStr,                                                      $cWhite),
         @("Path",     (Truncate-String ("~/Notes/" + $relPath) ($telemetryWidth - 15)),   $cGray)
     )
@@ -2354,18 +2352,8 @@ function Start-NotebookBrowser {
                 }
                 $leftDashes = [Math]::Max(0, $availLeft - $leftTitle.Length - $sortBadge.Length - $sortBufferLen)
 
-                $scrollNotice = ""
-                if ($previewLines.Count -gt $usableHeight) {
-                    $visEnd = [Math]::Min($previewLines.Count, $previewScrollOffset + $usableHeight)
-                    $scrollNotice = " [$($previewScrollOffset + 1)-$visEnd of $($previewLines.Count)] "
-                }
-
-                $rightTitle = " PREVIEW " + $scrollNotice
-                $rightDashes = $rightWidth - $rightTitle.Length - 1
-                if ($rightDashes -lt 0) {
-                    $rightTitle = " PREVIEW "
-                    $rightDashes = [Math]::Max(0, $rightWidth - $rightTitle.Length - 1)
-                }
+                $rightTitle = " PREVIEW "
+                $rightDashes = [Math]::Max(0, $rightWidth - $rightTitle.Length - 1)
 
                 # Outer Box Gradient Colors (Slate Graphite / Gray -> Vivid Flame Orange)
                 $cBorderStart = @(95, 100, 115)

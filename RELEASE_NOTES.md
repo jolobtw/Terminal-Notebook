@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.2
+**Date:** 2026-10-03
+
+### Visual De-cluttering & Telemetry Cleanup
+- **Simplified Preview Header:** Removed pagination count numbers (`[1-X of Y]`) from the preview pane top border header for a cleaner, minimalist `PREVIEW` badge.
+- **Clean Folder Telemetry:** Removed the redundant `Status: Open [v] / Closed [>]` row from the folder telemetry card, keeping folder preview details focused on name, note count, and path.
+
 ## Version 3.3.1
 **Date:** 2026-10-03
 
