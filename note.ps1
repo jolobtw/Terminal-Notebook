@@ -1914,7 +1914,7 @@ function Start-NotebookBrowser {
                 try { [Console]::SetCursorPosition(0, 0) } catch {}
                 [Console]::Write("$esc[H")
             }
-            [Console]::Write($sb.ToString())
+            [Console]::Write($sb.ToString().Replace("`r`n", "$esc[K`r`n") + "$esc[K$esc[J")
 
             # Responsive Read Keystroke & Resize Polling
             try { $key = Read-KeyOrResize } catch { break }

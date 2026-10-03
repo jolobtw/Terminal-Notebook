@@ -7,6 +7,9 @@
 - **Expand / Collapse All Folders Hotkey:** Added **`[C]`** (and `Shift+A` / `Shift+D`) to instantly expand or collapse all folders in the navigation tree at once.
 - **Nav Spec Legend Update:** Added `[C] All Folders` to the interactive bottom navigation bar legend.
 
+### Bug Fixes
+- **Action Legend Text Jumbling:** Added ANSI Erase-in-Line (`$esc[K`) sequence to every line in the atomic double-buffered frame output. This guarantees that when moving between notes and folders with different numbers of action badges, trailing characters from longer previous legend lines are instantly wiped clean rather than overlapping.
+
 ## Version 2.8.0
 **Date:** 2026-10-03
 
