@@ -7,8 +7,8 @@ A terminal-based notebook for browsing, writing, and organizing Markdown notes. 
 * **Terminal Markdown Rendering**: Natively parses and renders Markdown including Obsidian property cards, headers, blockquotes, Obsidian callouts (`> [!NOTE]`), checklists, fenced code blocks, tables, WikiLinks, and inline markdown (bold, italics, highlights, strikethroughs).
 * **Collapsible Folder Hierarchy**: Navigate through your `~/Notes` folder seamlessly with an interactive terminal tree view.
 * **Cross-Platform Compatibility**: Works identically on Windows and macOS via PowerShell Core (`pwsh`).
-* **Seamless Split-Pane Editing**: When running within modern Windows Terminal, editing or creating a note automatically splits your current tab side-by-side, allowing you to edit in your preferred tool (`micro`, `nvim`, etc.) without losing context of your folder tree!
-* **Obsidian Integration**: Deeply integrates with Obsidian. Create or open notes directly in Obsidian from the terminal, or edit them using terminal editors like `micro`, `nvim`, or `nano`.
+* **Seamless Split-Pane Editing**: When running within modern Windows Terminal, editing or creating a note automatically splits your current tab side-by-side, allowing you to edit in your preferred tool (`hx`, `nvim`, etc.) without losing context of your folder tree!
+* **Obsidian Integration**: Deeply integrates with Obsidian. Create or open notes directly in Obsidian from the terminal, or edit them using terminal editors like `hx`, `nvim`, or `nano`.
 * **Dynamic Layout**: The terminal interface dynamically resizes to fill your terminal window without flickering or artifacting. Long notes support `[J/K]` or `PageUp/PageDown` scrolling right in the preview pane.
 * **Quick Logs & Appending**: Quickly append thoughts or daily logs without needing to open a full text editor.
 

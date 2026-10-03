@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "2.5.3"
+$AppVersion = "2.6.0"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -157,6 +157,15 @@ if (-not $script:SortMode) {
 }
 
 function Get-PreferredTerminalEditor {
+    if (Get-Command hx -ErrorAction SilentlyContinue) {
+        return "hx"
+    }
+    if ($IsWindows) {
+        $hxWinGet = Resolve-Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Helix.Helix*\*\hx.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($hxWinGet) {
+            return $hxWinGet.Path
+        }
+    }
     if (Get-Command micro -ErrorAction SilentlyContinue) {
         return "micro"
     }
@@ -274,7 +283,10 @@ function Invoke-TerminalEditor {
     $lastLine = if ($rawLines) { [Math]::Max(1, $rawLines.Split([char]10).Count) } else { 1 }
 
     $edArgs = @()
-    if ($edLeaf -match 'micro') {
+    if ($edLeaf -match 'hx') {
+        if ($GoToEnd) { $edArgs += "$FilePath`:$lastLine" }
+        else { $edArgs += "$FilePath" }
+    } elseif ($edLeaf -match 'micro') {
         $edArgs += @("-colorscheme", "simple", "-softwrap", "true", "-wordwrap", "true", "$FilePath")
         if ($GoToEnd) { $edArgs += "+$lastLine" }
     } elseif ($edLeaf -match 'nvim|vim|nano') {

@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.6.0
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **Helix Editor Support:** Replaced `micro` as the primary default terminal editor with the much faster and modern `hx` (Helix). The editor is fully integrated and instantly launches with soft-wrapping enabled, alongside a custom `.toml` colorscheme that perfectly perfectly mirrors the Terminal Notes UI for completely seamless side-by-side editing.
+
 ## Version 2.5.3
 **Date:** 2026-10-02
 
