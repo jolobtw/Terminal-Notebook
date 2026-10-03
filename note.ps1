@@ -286,6 +286,12 @@ function Invoke-TerminalEditor {
         # We are inside modern Windows Terminal. Split the pane vertically so the user keeps the tree visible!
         $wtArgs = @("-w", "0", "split-pane", "-V", $EditorPath) + $edArgs
         Start-Process -FilePath "wt.exe" -ArgumentList $wtArgs
+        
+        # Sleep to allow Windows Terminal to complete the PTY split and resize event.
+        # This prevents the Notebook Browser from re-rendering the UI with the old full width,
+        # which would cause catastrophic line wrapping as the window shrinks!
+        Start-Sleep -Milliseconds 800
+        
         # Return instantly. The left pane (TerminalNotes) stays fully interactive while the right pane edits!
         return
     }
@@ -1429,7 +1435,12 @@ function Start-NotebookBrowser {
                 }
                 $previewLines += ""
                 $previewLines += ("  " + $cOrange + "Folder Actions:" + $rst)
-                $previewLines += ("    " + $cOrange + "[W/S] " + $cSilver + "Move  " + $cOrange + "[A/D] " + $cSilver + "Folders  " + $cOrange + "[R] " + $cSilver + "Rename  " + $cOrange + "[X] " + $cSilver + "Delete" + $rst)
+                if ($usableWidth -lt 55) {
+                    $previewLines += ("    " + $cOrange + "[W/S] " + $cSilver + "Move  " + $cOrange + "[A/D] " + $cSilver + "Folders" + $rst)
+                    $previewLines += ("    " + $cOrange + "[R] " + $cSilver + "Rename  " + $cOrange + "[X] " + $cSilver + "Delete" + $rst)
+                } else {
+                    $previewLines += ("    " + $cOrange + "[W/S] " + $cSilver + "Move  " + $cOrange + "[A/D] " + $cSilver + "Folders  " + $cOrange + "[R] " + $cSilver + "Rename  " + $cOrange + "[X] " + $cSilver + "Delete" + $rst)
+                }
             } else {
                 # Note
                 $currentRightTitle = $activeItem.FileName
@@ -1612,9 +1623,11 @@ function Start-NotebookBrowser {
                     $plain = $pLine -replace "\x1b\[[0-9;]*m", ""
                     if ($plain.Length -gt $rightWidth) {
                         $plain = $plain.Substring(0, $rightWidth)
+                        $rightStr = $plain
+                    } else {
+                        $padCount = [Math]::Max(0, $rightWidth - $plain.Length)
+                        $rightStr = $pLine + $rst + (" " * $padCount)
                     }
-                    $padCount = [Math]::Max(0, $rightWidth - $plain.Length)
-                    $rightStr = $pLine + $rst + (" " * $padCount)
                 } else {
                     if ($pLine -match '^#+\s+(.*)' -or $pLine -match '^[=]+$') {
                         $isHeader = $true
