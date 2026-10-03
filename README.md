@@ -8,34 +8,26 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 ## 🌟 Key Features
 
 ### 🖥️ Immersive Terminal UI
-* **Notebook Browser:** An interactive, zero-flicker TUI (Text User Interface) that reacts instantly to keystrokes.
-* **Sleek Aesthetics:** Features rounded outer app borders, top-to-bottom Slate Gray to Flame Orange vertical gradients, subtle Dark Gray tree connectors (`├─`, `└─`), and intelligent layout spacing for a clean, modern look.
-* **Inline Floating Modals:** Actions like creating folders (`F`), creating notes (`N`), logging quick thoughts (`L`), renaming (`R`), and deleting (`X`) open floating popup cards overlaid directly onto the TUI background.
-* **Frictionless Navigation:** Use `W/A/S/D` or Arrow Keys to fluidly navigate your folder hierarchy. The layout engine intelligently bypasses visual spacers to save you keystrokes.
-* **Dynamic Reflow:** The interface dynamically resizes to perfectly fill your terminal window without artifacting or line-wrapping destruction.
-
-### 📝 Rich Markdown Engine
-* **Native Terminal Rendering:** Renders raw Markdown directly into colorful terminal output.
-* **Advanced Element Support:** Perfectly parses and renders YAML Property Cards (Frontmatter), Obsidian-style Callouts (`> [!NOTE]`), checklists (`- [x]`), blockquotes, tables, and fenced code blocks.
-* **Inline Styling:** Supports Bold, Italics, Highlights (`==text==`), Strikethroughs, standard Markdown links, and Obsidian WikiLinks.
-* **Fullscreen Reader:** Press `V` or `Enter` to drop into a distraction-free fullscreen reading environment with built-in scrolling.
+* **Notebook Browser:** An interactive, zero-flicker TUI (Text User Interface) with fluid navigation (`W/A/S/D` or Arrow Keys).
+* **Sleek Aesthetics:** Features rounded outer app borders, top-to-bottom Gray-to-Orange vertical gradients, and solid dark slate floating cards.
+* **Inline Floating Modals:** Actions like creating notes (`N`), creating folders (`F`), logging quick thoughts (`L`), renaming (`R`), and deleting (`X`) open floating popup cards directly over the browser interface.
+* **Fullscreen Reader:** Press `V` or `Enter` to read notes in a distraction-free fullscreen view with built-in scrolling controls.
 
 ![Fullscreen Reader](docs/fullscreen-reader.png)
 
+### 📝 Rich Markdown Engine
+* **Native Markdown Rendering:** Renders raw Markdown into rich terminal output, including YAML frontmatter cards, Obsidian callouts (`> [!NOTE]`), fenced code blocks, tables, checklists (`- [x]`), wiki-links, and highlights (`==text==`).
 
 ### ⚡ Seamless Editing Workflows
-* **Split-Pane Editing (Windows Terminal):** When running within modern Windows Terminal, creating or editing a note instantly splits your terminal side-by-side! Edit in your preferred tool without losing sight of your folder tree.
-* **Editor Auto-Discovery:** Automatically detects and launches powerful terminal editors like `hx` (Helix), `micro`, `nvim`, `vim`, or `nano`.
-* **Quick Logging:** Quickly append passing thoughts to your daily log straight from the command line (`note "My quick thought"`).
+* **Split-Pane Editing (Windows Terminal):** Creating or editing a note automatically splits your terminal side-by-side so your folder tree stays visible.
+* **Editor Auto-Discovery:** Detects and launches your preferred terminal editor (`hx`, `micro`, `nvim`, `vim`, or `nano`).
+* **Quick Logging:** Append passing thoughts directly to today's daily log straight from your terminal (`note "My quick thought"`).
 
 ### 📚 Multi-Notebook Workspaces
-* **Instant Workspace Switching:** Seamlessly switch between separate notebook folders (e.g., Work vs. Personal) with press of a key (`B`) or straight from the command line (`note work`).
-* **Profile Aliases & Path Launching:** Launch directly into specific notebooks via CLI parameters (`note -Path ~/WorkNotes`) or named profile aliases.
-* **Persistent Configuration:** Saved notebook profiles and your active workspace persist automatically in `~/.terminal_notebook.json`.
+* **Instant Workspace Switching:** Seamlessly switch between separate notebook folders (e.g., Work vs. Personal) with `B` or straight from the command line (`note work`).
 
 ### 🌌 Deep Obsidian Integration
-* **Vault Detection:** Automatically reads your macOS or Windows Obsidian configurations to perfectly sync with your Vault.
-* **Direct Launching:** Press `O` on any note to instantly open it inside the native Obsidian desktop application.
+* **Obsidian Sync & Launching:** Auto-detects Obsidian vaults and lets you launch any note directly into Obsidian desktop with `O`.
 
 ---
 
@@ -85,12 +77,13 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 | `A/D` or `L/R` | Expand or collapse selected folder |
 | `C` or `Shift+A/D` | Expand or collapse ALL folders |
 | `J/K` or `PgUp/PgDn` | Scroll through long file previews |
-| `Enter` | Expand Folders |
+| `Enter` | Expand Folders / View Note |
 | `V` | Open Note in Fullscreen Reader |
 | `E` | Edit Note (Split-Pane Editor) |
 | `O` | Open Note in Obsidian Desktop |
 | `N` | Create a New Note |
 | `F` | Create a New Folder |
+| `L` | Quick Log Thought (Inline Modal) |
 | `B` | Switch Notebook Workspace (Work, Personal, etc.) |
 | `R` | Rename Item |
 | `X` or `Del` | Delete Item |
