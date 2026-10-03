@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.0.3
+**Date:** 2026-10-03
+
+### Bug Fixes
+- **Modal Card Footer Line Length Overflow:** Fixed hardcoded visible character count math in `Show-InlineInputModal` and `Show-InlineConfirmModal` footers. The static numbers missed 4 and 2 visible characters respectively, causing footer bottom border rows (`╰──── [Enter] Submit ... ────╯`) to calculate as `$cardW + 4` and `$cardW + 2` wide and trigger VT line wrapping, which distorted the right app border and shifted all lower TUI elements down by 1 row.
+- **Dynamic ANSI Strip Length & Defensive Width Clamping:** Replaced static footer length constants with dynamic `$AnsiRegex.Replace($footerKeys, '').Length` calculations, and added defensive visible width normalization in `Overlay-ModalOnFrame` (`$modalVisLen == $mw`) to strictly guarantee zero terminal line wrapping under all conditions.
+
 ## Version 3.0.2
 **Date:** 2026-10-03
 

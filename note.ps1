@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.0.2"
+$AppVersion = "3.0.3"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -436,6 +436,13 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
             $leftBg = $leftBgRaw + $rst
 
             $modalStr = $ModalLines[$mIdx]
+            $modalVisLen = ($AnsiRegex.Replace($modalStr, '')).Length
+            if ($modalVisLen -lt $mw) {
+                $modalStr = $modalStr.TrimEnd() + (" " * ($mw - $modalVisLen))
+            } elseif ($modalVisLen -gt $mw) {
+                $modalStr = Limit-AnsiText $modalStr $mw
+            }
+
             $rightCol = $leftCol + $mw
 
             $rightPreviewLen = ($TermWidth - 1) - $rightCol
@@ -487,7 +494,8 @@ function Show-InlineInputModal {
             $dispInput = "..." + $dispInput.Substring($dispInput.Length - ($innerW - 5))
         }
 
-        $headerTitle = " $Title "
+        $titleDisp = Truncate-String -Str $Title -MaxLen ($cardW - 6)
+        $headerTitle = " $titleDisp "
         $dashRight = [Math]::Max(2, $cardW - 3 - $headerTitle.Length)
         $topBorderColor = fg 95 100 115
         $botBorderColor = fg 255 130 0
@@ -519,7 +527,7 @@ function Show-InlineInputModal {
         $modalLines.Add($cardVBar + (" " * ($cardW - 2)) + $cardVBar)
 
         $footerKeys = "$cAmber[Enter]$cSilver $ConfirmActionLabel   $cAmber[Esc]$cSilver Cancel"
-        $footerVisibleLen = 8 + $ConfirmActionLabel.Length + 11
+        $footerVisibleLen = ($AnsiRegex.Replace($footerKeys, '')).Length
         $footDashRight = [Math]::Max(2, $cardW - 6 - $footerVisibleLen)
         $modalLines.Add($botBorderColor + $uRoundBL + ($bHoriz * 2) + " " + $footerKeys + " " + $botBorderColor + ($bHoriz * $footDashRight) + $uRoundBR + $rst)
 
@@ -578,7 +586,8 @@ function Show-InlineConfirmModal {
         $msgDisp = Truncate-String -Str $Message -MaxLen ($cardW - 4)
         $subDisp = Truncate-String -Str $SubMessage -MaxLen ($cardW - 4)
 
-        $headerTitle = " $Title "
+        $titleDisp = Truncate-String -Str $Title -MaxLen ($cardW - 6)
+        $headerTitle = " $titleDisp "
         $dashRight = [Math]::Max(2, $cardW - 3 - $headerTitle.Length)
         $topBorderColor = fg 255 80 80
         $botBorderColor = fg 255 100 30
@@ -602,7 +611,7 @@ function Show-InlineConfirmModal {
         $modalLines.Add($cardVBar + (" " * ($cardW - 2)) + $cardVBar)
 
         $footerKeys = "$cWarn[Y]$cSilver $ConfirmLabel   $cAmber[Esc/N]$cSilver Cancel"
-        $footerVisibleLen = 4 + $ConfirmLabel.Length + 15
+        $footerVisibleLen = ($AnsiRegex.Replace($footerKeys, '')).Length
         $footDashRight = [Math]::Max(2, $cardW - 6 - $footerVisibleLen)
         $modalLines.Add($botBorderColor + $uRoundBL + ($bHoriz * 2) + " " + $footerKeys + " " + $botBorderColor + ($bHoriz * $footDashRight) + $uRoundBR + $rst)
 
