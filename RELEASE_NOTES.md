@@ -1,5 +1,11 @@
 # Terminal Notes Release Notes
 
+## Version 2.5.1
+**Date:** 2026-10-02
+
+### Bug Fixes
+- **Fullscreen Reader Scroll Bleed:** Fixed a bug where entering the interactive Fullscreen Reader would still print an implicit trailing newline, causing the terminal window to scroll down by one line and hiding the top "Terminal Notebook" banner. The viewport now perfectly fits the screen height and anchors cleanly to the top without jumping.
+
 ## Version 2.5.0
 **Date:** 2026-10-02
 
