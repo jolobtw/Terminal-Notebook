@@ -104,3 +104,11 @@
 
 ### Features & Tweaks
 - **Folder Telemetry Redesign:** Completely redesigned the Folder Telemetry card to visually match the sleek Properties box styling used in the Note Reader. The thick 3-line Aurora block graphic was replaced with a thin, gorgeous bounding box that spans the full width of the preview pane. To add visual contrast against the main application header, the telemetry box's gradient is rendered in reverse (Flame Orange to Graphite). 
+
+## Version 2.0.0
+**Date:** 2026-10-02
+
+### Major Features
+- **Seamless Split-Pane Editor (Windows Terminal Integration):** Completely revolutionized the editing workflow! When running the app inside Windows Terminal, pressing [E] to edit or [N] to create a new note will no longer hijack your screen. Instead, the app seamlessly signals Windows Terminal to split your current tab down the middle. Your Terminal Notebook remains fully active, scrollable, and usable on the left, while your deep-work text editor (micro, 
+ano, 
+vim) opens natively on the right. When you exit your editor, the split-pane vanishes and the tab intelligently merges back to full-screen. This is a massive quality-of-life buff for maintaining context, referencing file names, and reading old notes while writing new ones!

@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.15"
+$AppVersion = "2.0"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -267,24 +267,31 @@ function Invoke-TerminalEditor {
 
     $edLeaf = Split-Path $EditorPath -Leaf
 
-    if ($GoToEnd) {
-        $lines = Get-Content -Path $FilePath
-        $lastLine = if ($lines) { [Math]::Max(1, $lines.Count) } else { 1 }
+    $lines = Get-Content -Path $FilePath
+    $lastLine = if ($lines) { [Math]::Max(1, $lines.Count) } else { 1 }
 
-        if ($edLeaf -match 'micro') {
-            & $EditorPath -softwrap true -wordwrap true "$FilePath" "+$lastLine"
-        } elseif ($edLeaf -match 'nvim|vim|nano') {
-            & $EditorPath "+$lastLine" "$FilePath"
-        } else {
-            & $EditorPath "$FilePath"
-        }
+    $edArgs = @()
+    if ($edLeaf -match 'micro') {
+        $edArgs += @("-softwrap", "true", "-wordwrap", "true", "$FilePath")
+        if ($GoToEnd) { $edArgs += "+$lastLine" }
+    } elseif ($edLeaf -match 'nvim|vim|nano') {
+        if ($GoToEnd) { $edArgs += "+$lastLine" }
+        $edArgs += "$FilePath"
     } else {
-        if ($edLeaf -match 'micro') {
-            & $EditorPath -softwrap true -wordwrap true "$FilePath"
-        } else {
-            & $EditorPath "$FilePath"
-        }
+        $edArgs += "$FilePath"
     }
+
+    # Version 2.0: Windows Terminal Seamless Split-Pane Editing
+    if ($env:WT_SESSION) {
+        # We are inside modern Windows Terminal. Split the pane vertically so the user keeps the tree visible!
+        $wtArgs = @("-w", "0", "split-pane", "-V", $EditorPath) + $edArgs
+        Start-Process -FilePath "wt.exe" -ArgumentList $wtArgs
+        # Return instantly. The left pane (TerminalNotes) stays fully interactive while the right pane edits!
+        return
+    }
+
+    # Fallback for old consolehost: block and run in-place
+    & $EditorPath @edArgs
 }
 
 function Get-AllNotes {
