@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.2.5"
+$AppVersion = "3.2.6"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -245,6 +245,7 @@ $rst = "$esc[0m"
 # ANSI text style codes
 $sBold         = "$esc[1m"
 $sNoBold       = "$esc[22m"
+$sFaint        = "$esc[2m"
 $sItalic       = "$esc[3m"
 $sNoItalic     = "$esc[23m"
 $sStrike       = "$esc[9m"
@@ -433,7 +434,8 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
             if ($leftVisLen -lt $leftCol) {
                 $leftBgRaw += (" " * ($leftCol - $leftVisLen))
             }
-            $leftBg = $leftBgRaw + $rst
+            # Apply faint dimming to background text to the left of modal box
+            $leftBg = $sFaint + $leftBgRaw + $rst
 
             $modalStr = $ModalLines[$mIdx]
             $modalVisLen = ($AnsiRegex.Replace($modalStr, '')).Length
@@ -457,14 +459,16 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
                 if ($plainRight.Length -lt $rightPreviewLen) {
                     $plainRight = $plainRight.PadRight($rightPreviewLen)
                 }
-                $rightPreview = $cSilver + $plainRight + $rst
+                # Dim preview text to the right of modal box
+                $rightPreview = $cDarkGray + $sFaint + $plainRight + $rst
             }
 
             $rightBorder = Get-RightBorderANSI $FrameLines[$i] $TermWidth
 
             $outLines.Add($leftBg + $modalStr + $rightPreview + $rightBorder)
         } else {
-            $outLines.Add($FrameLines[$i])
+            # Apply faint dimming to full background rows outside modal box height
+            $outLines.Add($sFaint + $FrameLines[$i] + $rst)
         }
     }
     return $outLines

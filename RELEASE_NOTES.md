@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.2.6
+**Date:** 2026-10-03
+
+### Visual Polish & Modal Contrast
+- **Faint Background Dimming:** Applied ANSI faint/dim mode (`$sFaint`) to all background frame lines whenever an inline modal card is open. This lowers background intensity to 50%, ensuring floating dialogs (`N`, `F`, `L`, `R`, `X`) pop out with crisp legibility over busy background content.
+
 ## Version 3.2.5
 **Date:** 2026-10-03
 
