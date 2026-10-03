@@ -703,12 +703,12 @@ function Sort-NoteFolders($Dirs) {
 }
 
 function Get-NoteFolders {
-    return @(Get-ChildItem -LiteralPath $NotesDir -Directory -Recurse -ErrorAction SilentlyContinue |
+    return @(Get-ChildItem -LiteralPath $script:NotesDir -Directory -Recurse -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName -notmatch $ExcludedDirPattern })
 }
 
 function Get-AllNotes {
-    $raw = Get-ChildItem -LiteralPath $NotesDir -Filter "*.md" -Recurse -File -ErrorAction SilentlyContinue |
+    $raw = Get-ChildItem -LiteralPath $script:NotesDir -Filter "*.md" -Recurse -File -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName -notmatch $ExcludedDirPattern }
     return @(Sort-NoteFiles $raw)
 }
@@ -1653,14 +1653,13 @@ function Start-NotebookBrowser {
 
     function Expand-AllFolders {
         $script:CollapsedFolders.Clear()
-        $itemsDirty = $true
     }
 
     function Collapse-AllFolders {
+        $script:CollapsedFolders.Clear()
         foreach ($d in (Get-NoteFolders)) {
             $script:CollapsedFolders[$d.FullName] = $true
         }
-        $itemsDirty = $true
     }
 
     $selectedIndex = 0
@@ -1983,11 +1982,13 @@ function Start-NotebookBrowser {
                             Collapse-AllFolders
                         }
                     }
+                    $itemsDirty = $true
                 }
                 { $_ -in @("RightArrow", "D") } {
                     $hasShift = ($key.Modifiers -band [System.ConsoleModifiers]::Shift)
                     if ($hasShift) {
                         Expand-AllFolders
+                        $itemsDirty = $true
                     } elseif ($activeItem -and $activeItem.Type -eq "Folder" -and -not $activeItem.IsExpanded) {
                         $script:CollapsedFolders.Remove($activeItem.FullName)
                         $itemsDirty = $true
@@ -1997,6 +1998,7 @@ function Start-NotebookBrowser {
                     $hasShift = ($key.Modifiers -band [System.ConsoleModifiers]::Shift)
                     if ($hasShift) {
                         Collapse-AllFolders
+                        $itemsDirty = $true
                     } elseif ($activeItem) {
                         if ($activeItem.Type -eq "Folder" -and $activeItem.IsExpanded) {
                             $script:CollapsedFolders[$activeItem.FullName] = $true
