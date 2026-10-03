@@ -1170,7 +1170,7 @@ function View-FullscreenNote {
         if ($ReadOnly) {
             $footer += $cOrange + "[Up/Dn/PgUp/PgDn]" + $cSilver + " Scroll  " + 
                        $cOrange + "[Q/Esc]" + $cSilver + " Return..." + $scrollNotice
-            Write-Host ($footer + $rst)
+            [Console]::Write($footer + $rst)
             try {
                 $k = [Console]::ReadKey($true)
                 $key = $k.Key
@@ -1186,7 +1186,7 @@ function View-FullscreenNote {
                        $cOrange + "[O]" + $cSilver + " Obsidian  " + 
                        $cOrange + "[P]" + $cSilver + " Append  " + 
                        $cOrange + "[Q/Esc]" + $cSilver + " Return..." + $scrollNotice
-            Write-Host ($footer + $rst)
+            [Console]::Write($footer + $rst)
             try {
                 $k = [Console]::ReadKey($true)
                 $key = $k.Key
