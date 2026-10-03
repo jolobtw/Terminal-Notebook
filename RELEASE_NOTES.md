@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.2.2
+**Date:** 2026-10-03
+
+### Navigation Tree Cleanliness
+- **Clean Root Folder Indentation:** Removed dangling tree branch lines (`├──`, `└──`) from top-level items directly under the root notebook directory. First-level items under root folders now display with a clean 2-space indent, while nested subfolders (`Level 2+`) maintain connected tree lines directly aligned under parent expand/collapse arrows (`▼`/`▶`).
+
 ## Version 3.2.1
 **Date:** 2026-10-03
 
