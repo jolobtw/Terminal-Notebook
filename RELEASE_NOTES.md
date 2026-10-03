@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 2.9.2
+**Date:** 2026-10-03
+
+### UI Styling & Polish
+- **Rounded Outer App Border:** Upgraded the main application frame's outer corners from sharp box joints (`┌`, `┐`, `└`, `┘`) to smooth rounded corners (`╭`, `╮`, `╰`, `╯`), matching the card styling used in callouts, code blocks, and folder telemetry panels.
+- **Vertical Top-to-Bottom Border Gradient:** Applied a dynamic vertical gradient across the outer frame and center pane divider that transitions smoothly from Slate Graphite Gray (`#5F6473`) at the top to Vivid Flame Orange (`#FF8200`) at the bottom.
+
 ## Version 2.9.1
 **Date:** 2026-10-03
 

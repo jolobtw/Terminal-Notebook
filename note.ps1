@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "2.9.1"
+$AppVersion = "2.9.2"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1842,10 +1842,20 @@ function Start-NotebookBrowser {
                 $rightDashes = [Math]::Max(0, $rightWidth - $rightTitle.Length - 1)
             }
 
-            [void]$sb.Append($cDarkGray + $bTopLeft + $bHoriz + $cOrange + $leftTitle + $cDarkGray + ($bHoriz * $leftDashes) + $cAmber + $sortBadge + $cDarkGray + $bTopT + $bHoriz + $cOrange + $rightTitle + $cDarkGray + ($bHoriz * $rightDashes) + $bTopRight + $rst + "`r`n")
+            # Outer Box Gradient Colors (Slate Graphite / Gray -> Vivid Flame Orange)
+            $cBorderStart = @(95, 100, 115)
+            $cBorderEnd   = @(255, 130, 0)
+            $topBorderColor = fg $cBorderStart[0] $cBorderStart[1] $cBorderStart[2]
+            $botBorderColor = fg $cBorderEnd[0] $cBorderEnd[1] $cBorderEnd[2]
+
+            [void]$sb.Append($topBorderColor + $uRoundTL + $bHoriz + $cOrange + $leftTitle + $topBorderColor + ($bHoriz * $leftDashes) + $cAmber + $sortBadge + $topBorderColor + $bTopT + $bHoriz + $cOrange + $rightTitle + $topBorderColor + ($bHoriz * $rightDashes) + $uRoundTR + $rst + "`r`n")
 
             # 3. Render Rows
             for ($r = 0; $r -lt $boxHeight; $r++) {
+                $tRatio = ($r + 1) / ($boxHeight + 1.0)
+                $rowRgb = Get-GradientColor $cBorderStart $cBorderEnd $tRatio
+                $vBar = (fg $rowRgb[0] $rowRgb[1] $rowRgb[2]) + $bVert + $rst
+
                 if ($r -eq 0) {
                     # Top padding row to give breathing room beneath headers
                     $blankLeft = $vBar + (" " * $leftWidth) + $rst
@@ -1901,7 +1911,7 @@ function Start-NotebookBrowser {
             }
 
             # 4. Box Footer
-            [void]$sb.AppendLine($cDarkGray + $bBotLeft + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $rightWidth) + $bBotRight + $rst)
+            [void]$sb.AppendLine($botBorderColor + $uRoundBL + ($bHoriz * $leftWidth) + $bBotT + ($bHoriz * $rightWidth) + $uRoundBR + $rst)
 
             # 5. Navigation Bar
             [void]$sb.Append($navBar)
