@@ -98,3 +98,9 @@
 
 ### Features & Tweaks
 - **UI Consistency:** The top "Terminal Notebook" Aurora gradient banner is now preserved and displayed when diving into the Fullscreen Reader mode (including the Release Notes viewer). The hotkey formatting in the reader mode has also been restyled to exactly match the look of the main application menu.
+
+## Version 1.15
+**Date:** 2026-10-02
+
+### Features & Tweaks
+- **Folder Telemetry Redesign:** Completely redesigned the Folder Telemetry card to visually match the sleek Properties box styling used in the Note Reader. The thick 3-line Aurora block graphic was replaced with a thin, gorgeous bounding box that spans the full width of the preview pane. To add visual contrast against the main application header, the telemetry box's gradient is rendered in reverse (Flame Orange to Graphite). 

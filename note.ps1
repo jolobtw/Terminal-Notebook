@@ -14,7 +14,7 @@ param(
     [string[]]$ArgsList
 )
 
-$AppVersion = "1.14"
+$AppVersion = "1.15"
 
 # Refresh PATH from registry so newly installed winget packages (like micro) work immediately
 try {
@@ -132,15 +132,7 @@ function Render-AuroraWave([int]$width, $c1, $c2, $c3, [string]$char) {
     return $out + $rst
 }
 
-function Make-CardLine($label, $val, $valCol, $miniWidth) {
-    $bVertChar = [string][char]0x2502
-    $content = "  " + $label.PadRight(10) + ": " + $val
-    $spaceNeeded = [Math]::Max(0, ($miniWidth - 2 - $content.Length))
-    $pad = " " * $spaceNeeded
-    $cCardBorder = fg 110 115 130
-    $cCardLabel  = fg 155 160 175
-    return ($cCardBorder + "  $bVertChar" + $cCardLabel + "  " + $label.PadRight(10) + ": " + $valCol + $val + $rst + $pad + $cCardBorder + "$bVertChar" + $rst)
-}
+
 
 # Folder expansion state table & Preferences
 if (-not $script:ExpandedFolders) {
@@ -1379,38 +1371,43 @@ function Start-NotebookBrowser {
             if ($activeItem.Type -eq "Folder") {
                 $currentRightTitle = "Folder: " + $activeItem.Name
 
-                $miniWidth = [Math]::Min(46, $rightWidth - 6)
-                if ($miniWidth -lt 24) { $miniWidth = 24 }
+                $telemetryWidth = [Math]::Max(30, $usableWidth)
 
-                $folderTitle = ".  *  +    FOLDER TELEMETRY    +  *  ."
-                $titlePad = " " * [Math]::Max(0, [int](($miniWidth - $folderTitle.Length) / 2))
-                $previewLines += ("  " + $titlePad + (Render-GradientText $folderTitle $gWaveDark $gWaveOrange))
+                $boxTitle = " FOLDER TELEMETRY "
+                $dashesLeft = 2
+                $dashesRight = [Math]::Max(2, $telemetryWidth - $boxTitle.Length - $dashesLeft - 2)
+                # Reverse gradient: Orange to DarkGray
+                $topBorderStr = $uRoundTL + ($uHoriz * $dashesLeft) + $boxTitle + ($uHoriz * $dashesRight) + $uRoundTR
+                $coloredTop = "  " + (Render-GradientText $topBorderStr $gWaveOrange $gWaveDark)
+                $previewLines += $coloredTop
 
-                $waveTopMini = "  " + (Render-AuroraWave $miniWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2584))
-                $waveMidMini = "  " + (Render-AuroraWave $miniWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2588))
-                $waveBotMini = "  " + (Render-AuroraWave $miniWidth $gWaveDark $gWaveOrange $gWaveAmber ([string][char]0x2580))
-                $previewLines += $waveTopMini
-                $previewLines += $waveMidMini
-                $previewLines += $waveBotMini
-                $previewLines += ""
+                $leftBar = Render-GradientText $uVert $gWaveOrange $gWaveDark
+                $rightBar = Render-GradientText $uVert $gWaveDark $gWaveOrange
 
                 $statusStr = if ($activeItem.IsExpanded) { "Open [v]" } else { "Closed [>]" }
-                $shortName = Truncate-String -Str $activeItem.Name -MaxLen ($miniWidth - 18)
+                $shortName = Truncate-String -Str $activeItem.Name -MaxLen ($telemetryWidth - 18)
                 $noteCountStr = if ($activeItem.ItemCount -gt 0) { "$($activeItem.ItemCount) note(s)" } else { "0 notes (empty)" }
                 $relPath = $activeItem.FullName.Substring($NotesDir.Length).TrimStart('\', '/')
                 if ([string]::IsNullOrEmpty($relPath)) { $relPath = "/" }
-                $shortRelPath = Truncate-String -Str ("~/Notes/" + $relPath) -MaxLen ($miniWidth - 18)
+                $shortRelPath = Truncate-String -Str ("~/Notes/" + $relPath) -MaxLen ($telemetryWidth - 18)
 
-                $cardBorder = fg 110 115 130
-                $cardTop = $cardBorder + "  $bTopLeft" + ($bHoriz * ($miniWidth - 2)) + "$bTopRight" + $rst
-                $cardBot = $cardBorder + "  $bBotLeft" + ($bHoriz * ($miniWidth - 2)) + "$bBotRight" + $rst
+                $cCardLabel  = fg 155 160 175
 
-                $previewLines += $cardTop
-                $previewLines += (Make-CardLine "Folder" $shortName $cWhite $miniWidth)
-                $previewLines += (Make-CardLine "Status" $statusStr $cOrange $miniWidth)
-                $previewLines += (Make-CardLine "Contents" $noteCountStr $cWhite $miniWidth)
-                $previewLines += (Make-CardLine "Path" $shortRelPath $cGray $miniWidth)
-                $previewLines += $cardBot
+                function Get-TLine($lbl, $val, $valCol) {
+                    $content = " " + $lbl.PadRight(10) + ": " + $val
+                    $padLen = [Math]::Max(0, $telemetryWidth - 2 - $content.Length)
+                    $pad = " " * $padLen
+                    return "  " + $leftBar + $cCardLabel + " " + $lbl.PadRight(10) + ": " + $valCol + $val + $rst + $pad + $rightBar
+                }
+
+                $previewLines += Get-TLine "Folder" $shortName $cWhite
+                $previewLines += Get-TLine "Status" $statusStr $cOrange
+                $previewLines += Get-TLine "Contents" $noteCountStr $cWhite
+                $previewLines += Get-TLine "Path" $shortRelPath $cGray
+
+                $botBorderStr = $uRoundBL + ($uHoriz * ($telemetryWidth - 2)) + $uRoundBR
+                $coloredBot = "  " + (Render-GradientText $botBorderStr $gWaveOrange $gWaveDark)
+                $previewLines += $coloredBot
                 $previewLines += ""
 
                 $folderFiles = Get-ChildItem -Path $activeItem.FullName -File -Filter "*.md" -ErrorAction SilentlyContinue
