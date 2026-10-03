@@ -3,7 +3,7 @@
 A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing, and organizing Markdown notes. It bridges the speed and workflow of the command line with the rich formatting and organizational power of modern note-taking apps like Obsidian.
 
 ![Terminal Notes Main UI](docs/main-ui.png)
-*(Drop a screenshot of the main Notebook Browser here!)*
+
 
 ## 🌟 Key Features
 
@@ -20,7 +20,7 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 * **Fullscreen Reader:** Press `V` or `Enter` to drop into a distraction-free fullscreen reading environment with built-in scrolling.
 
 ![Fullscreen Reader](docs/fullscreen-reader.png)
-*(Drop a screenshot of the Fullscreen Reader here!)*
+
 
 ### ⚡ Seamless Editing Workflows
 * **Split-Pane Editing (Windows Terminal):** When running within modern Windows Terminal, creating or editing a note instantly splits your terminal side-by-side! Edit in your preferred tool without losing sight of your folder tree.
