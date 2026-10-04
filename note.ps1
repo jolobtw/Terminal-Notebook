@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.4"
+$AppVersion = "3.3.5"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -426,8 +426,8 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
 
     $outLines = [System.Collections.Generic.List[string]]::new()
     $dimStyle = $cDarkGray + $sFaint
-    # Concept 2: Warm Amber Ambient Glow Drop Shadow (Rich dark bronze background + warm amber text)
-    $shadowStyle = (bg 60 36 16) + (fg 240 170 70)
+    # Slim & Subtle Ambient Glow Drop Shadow (Soft muted bronze background + faint amber text)
+    $shadowStyle = (bg 42 30 18) + (fg 160 120 70) + $sFaint
 
     for ($i = 0; $i -lt $FrameLines.Count; $i++) {
         if ($i -ge $topRow -and ($i - $topRow) -lt $mh) {
@@ -452,13 +452,13 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
                 $modalStr = Limit-AnsiText $modalStr $mw
             }
 
-            # Right shadow logic: 2 columns right of the card for rows topRow + 1 to topRow + mh - 1
+            # Right shadow logic: 1 column right of the card for rows topRow + 1 to topRow + mh - 1
             $rightCol = $leftCol + $mw
             $rightStr = ""
 
             if ($mIdx -ge 1) {
-                # Add 2-column warm amber drop shadow right next to card
-                $shadowWidth = [Math]::Min(2, [Math]::Max(0, ($TermWidth - 1) - $rightCol))
+                # Add slim 1-column soft ambient drop shadow right next to card
+                $shadowWidth = [Math]::Min(1, [Math]::Max(0, ($TermWidth - 1) - $rightCol))
                 if ($shadowWidth -gt 0) {
                     $shadowPlain = Get-PlainSubstring $FrameLines[$i] $rightCol $shadowWidth
                     if ($shadowPlain.Length -lt $shadowWidth) { $shadowPlain = $shadowPlain.PadRight($shadowWidth) }
@@ -485,8 +485,8 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
             $rightBorder = $dimStyle + $bVert + $rst
             $outLines.Add($leftBg + $modalStr + $rightStr + $rightBorder)
         } elseif ($i -eq ($topRow + $mh) -and $mh -gt 0) {
-            # Bottom drop shadow row directly beneath the modal box (offset 2 columns right, extending under right shadow)
-            $botShadowStart = $leftCol + 2
+            # Bottom drop shadow row directly beneath the modal box (offset 1 column right)
+            $botShadowStart = $leftCol + 1
             $botShadowWidth = $mw
 
             $leftLen = [Math]::Min($botShadowStart, $TermWidth - 1)

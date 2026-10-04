@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.5
+**Date:** 2026-10-03
+
+### Refined Slim & Subtle Popup Drop Shadow
+- **Slimmer 1-Column Width:** Reduced modal drop shadow width from 2 columns to a sleek, minimal 1-column offset right and 1-row offset down.
+- **Subtle Softened Palette:** Softened shadow background to dark chocolate bronze (`bg 42 30 18`) with faint muted amber text (`fg 160 120 70` + `$sFaint`), delivering a clean, non-distracting 3D lift.
+
 ## Version 3.3.4
 **Date:** 2026-10-03
 
