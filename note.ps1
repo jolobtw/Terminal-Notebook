@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.6"
+$AppVersion = "3.3.7"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -427,7 +427,7 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
     $outLines = [System.Collections.Generic.List[string]]::new()
     $dimStyle = $cDarkGray + $sFaint
     # Slim & Subtle Ambient Glow Drop Shadow (Soft muted bronze background + faint amber text)
-    $shadowStyle = (bg 42 30 18) + (fg 160 120 70) + $sFaint
+    $shadowStyle = (bg 36 26 16) + (fg 140 105 60) + $sFaint
 
     for ($i = 0; $i -lt $FrameLines.Count; $i++) {
         if ($i -ge $topRow -and ($i - $topRow) -lt $mh) {
@@ -485,7 +485,7 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
             $rightBorder = $dimStyle + $bVert + $rst
             $outLines.Add($leftBg + $modalStr + $rightStr + $rightBorder)
         } elseif ($i -eq ($topRow + $mh) -and $mh -gt 0) {
-            # Slim half-height bottom drop shadow row directly beneath the modal box (offset 1 column right)
+            # Slim subtle bottom drop shadow row directly beneath the modal box (offset 1 column right)
             $botShadowStart = $leftCol + 1
             $botShadowWidth = $mw
 
@@ -494,10 +494,9 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
             if ($leftPlain.Length -lt $leftLen) { $leftPlain = $leftPlain.PadRight($leftLen) }
             $leftBg = $dimStyle + $leftPlain + $rst
 
-            # Lower half-block glyph (0x2584) renders top half with dim background and bottom half with dark bronze shadow!
-            $halfBlock = [string][char]0x2584
-            $shadowFg = fg 42 30 18
-            $shadowSegment = (bg 25 28 35) + $shadowFg + ($halfBlock * $botShadowWidth) + $rst
+            $shadowPlain = Get-PlainSubstring $FrameLines[$i] $botShadowStart $botShadowWidth
+            if ($shadowPlain.Length -lt $botShadowWidth) { $shadowPlain = $shadowPlain.PadRight($botShadowWidth) }
+            $shadowSegment = $shadowStyle + $shadowPlain + $rst
 
             $previewStart = $botShadowStart + $botShadowWidth
             $rightPreviewLen = [Math]::Max(0, ($TermWidth - 1) - $previewStart)

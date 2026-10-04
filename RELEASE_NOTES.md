@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.7
+**Date:** 2026-10-03
+
+### Seamless Drop Shadow Color Consistency
+- **Eliminated Blue-ish Discoloration:** Removed hardcoded background color (`bg 25 28 35`) from the bottom drop shadow row in `Overlay-ModalOnFrame`.
+- **Unified Shadow Styling:** Standardized both bottom and right drop shadows to apply the exact same soft dark bronze shadow style (`bg 36 26 16 + fg 140 105 60 + $sFaint`) over actual background text, ensuring zero color artifacts above or within the shadow area.
+
 ## Version 3.3.6
 **Date:** 2026-10-03
 
