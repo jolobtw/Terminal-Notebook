@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.4
+**Date:** 2026-10-03
+
+### Modal Popup Warm Flame-Amber Ambient Glow Drop Shadow
+- **3D Floating Elevation:** Added a 2-column right and 1-row bottom ambient drop shadow to inline floating popup dialogs (`Show-InlineInputModal`, `Show-InlineConfirmModal`, `Show-InlineAlertModal`).
+- **Warm Bronze & Amber Palette:** Styled shadow cells with a rich warm bronze background (`bg 60 36 16`) and warm amber text (`fg 240 170 70`), creating an ambient glow that lifts dialog cards off the dimmed TUI backdrop.
+
 ## Version 3.3.3
 **Date:** 2026-10-03
 
