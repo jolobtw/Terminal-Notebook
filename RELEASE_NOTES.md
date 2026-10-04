@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.6
+**Date:** 2026-10-03
+
+### Half-Height Ultra-Slim Bottom Drop Shadow
+- **Half-Height Lower Block Rendering:** Rendered bottom shadow row using Unicode lower half-blocks (`▄` / `0x2584`), reducing the bottom shadow vertical thickness by 50%.
+- **Pixel-Matched Aspect Ratio:** Perfectly matches the visual pixel thinness of the 1-column side shadow for a balanced, ultra-slim 3D shadow frame.
+
 ## Version 3.3.5
 **Date:** 2026-10-03
 
