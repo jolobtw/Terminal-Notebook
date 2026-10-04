@@ -1,5 +1,12 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.3
+**Date:** 2026-10-03
+
+### Split-Pane Terminal Editor Profile Inheritance
+- **Active Profile Inheritance:** Updated `Invoke-TerminalEditor` in Windows Terminal split-pane mode to explicitly pass `-p "$env:WT_PROFILE_ID"`.
+- **Consistent Font & Zoom Size:** Guarantees that newly launched terminal editors (Helix, Micro, Neovim, Nano, Vim) inherit the exact font family, font size, cell padding, and zoom level of the parent Terminal Notebook pane.
+
 ## Version 3.3.2
 **Date:** 2026-10-03
 

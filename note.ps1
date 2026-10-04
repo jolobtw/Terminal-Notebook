@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.2"
+$AppVersion = "3.3.3"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1002,7 +1002,9 @@ function Invoke-TerminalEditor {
     # Version 2.0: Windows Terminal Seamless Split-Pane Editing
     if ($env:WT_SESSION) {
         # We are inside modern Windows Terminal. Split the pane vertically so the user keeps the tree visible!
-        $wtArgsString = "-w 0 split-pane -V " + (ConvertTo-WtArg $EditorPath -AlwaysQuote) + " " +
+        # Explicitly pass the active profile ID (-p) so the split-pane editor inherits the exact same font size and profile settings as the parent pane.
+        $profileArg = if ($env:WT_PROFILE_ID) { "-p " + (ConvertTo-WtArg $env:WT_PROFILE_ID) + " " } else { "" }
+        $wtArgsString = "-w 0 split-pane -V " + $profileArg + (ConvertTo-WtArg $EditorPath -AlwaysQuote) + " " +
                         (($edArgs | ForEach-Object { ConvertTo-WtArg $_ }) -join " ")
         Start-Process -FilePath "wt.exe" -ArgumentList $wtArgsString
 
