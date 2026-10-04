@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.7"
+$AppVersion = "3.3.8"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -426,8 +426,6 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
 
     $outLines = [System.Collections.Generic.List[string]]::new()
     $dimStyle = $cDarkGray + $sFaint
-    # Slim & Subtle Ambient Glow Drop Shadow (Soft muted bronze background + faint amber text)
-    $shadowStyle = (bg 36 26 16) + (fg 140 105 60) + $sFaint
 
     for ($i = 0; $i -lt $FrameLines.Count; $i++) {
         if ($i -ge $topRow -and ($i - $topRow) -lt $mh) {
@@ -452,65 +450,24 @@ function Overlay-ModalOnFrame($FrameLines, $ModalLines, [int]$TermWidth) {
                 $modalStr = Limit-AnsiText $modalStr $mw
             }
 
-            # Right shadow logic: 1 column right of the card for rows topRow + 1 to topRow + mh - 1
             $rightCol = $leftCol + $mw
-            $rightStr = ""
 
-            if ($mIdx -ge 1) {
-                # Add slim 1-column soft ambient drop shadow right next to card
-                $shadowWidth = [Math]::Min(1, [Math]::Max(0, ($TermWidth - 1) - $rightCol))
-                if ($shadowWidth -gt 0) {
-                    $shadowPlain = Get-PlainSubstring $FrameLines[$i] $rightCol $shadowWidth
-                    if ($shadowPlain.Length -lt $shadowWidth) { $shadowPlain = $shadowPlain.PadRight($shadowWidth) }
-                    $rightStr += $shadowStyle + $shadowPlain + $rst
-                }
-
-                $previewStart = $rightCol + $shadowWidth
-                $rightPreviewLen = [Math]::Max(0, ($TermWidth - 1) - $previewStart)
-                if ($rightPreviewLen -gt 0) {
-                    $plainRight = Get-PlainSubstring $FrameLines[$i] $previewStart $rightPreviewLen
-                    if ($plainRight.Length -lt $rightPreviewLen) { $plainRight = $plainRight.PadRight($rightPreviewLen) }
-                    $rightStr += $dimStyle + $plainRight + $rst
-                }
-            } else {
-                # Top row of modal: no right shadow (gives top-left light angle)
-                $rightPreviewLen = [Math]::Max(0, ($TermWidth - 1) - $rightCol)
-                if ($rightPreviewLen -gt 0) {
-                    $plainRight = Get-PlainSubstring $FrameLines[$i] $rightCol $rightPreviewLen
-                    if ($plainRight.Length -lt $rightPreviewLen) { $plainRight = $plainRight.PadRight($rightPreviewLen) }
-                    $rightStr += $dimStyle + $plainRight + $rst
-                }
-            }
-
-            $rightBorder = $dimStyle + $bVert + $rst
-            $outLines.Add($leftBg + $modalStr + $rightStr + $rightBorder)
-        } elseif ($i -eq ($topRow + $mh) -and $mh -gt 0) {
-            # Slim subtle bottom drop shadow row directly beneath the modal box (offset 1 column right)
-            $botShadowStart = $leftCol + 1
-            $botShadowWidth = $mw
-
-            $leftLen = [Math]::Min($botShadowStart, $TermWidth - 1)
-            $leftPlain = Get-PlainSubstring $FrameLines[$i] 0 $leftLen
-            if ($leftPlain.Length -lt $leftLen) { $leftPlain = $leftPlain.PadRight($leftLen) }
-            $leftBg = $dimStyle + $leftPlain + $rst
-
-            $shadowPlain = Get-PlainSubstring $FrameLines[$i] $botShadowStart $botShadowWidth
-            if ($shadowPlain.Length -lt $botShadowWidth) { $shadowPlain = $shadowPlain.PadRight($botShadowWidth) }
-            $shadowSegment = $shadowStyle + $shadowPlain + $rst
-
-            $previewStart = $botShadowStart + $botShadowWidth
-            $rightPreviewLen = [Math]::Max(0, ($TermWidth - 1) - $previewStart)
+            $rightPreviewLen = ($TermWidth - 1) - $rightCol
             $rightPreview = ""
             if ($rightPreviewLen -gt 0) {
-                $plainRight = Get-PlainSubstring $FrameLines[$i] $previewStart $rightPreviewLen
-                if ($plainRight.Length -lt $rightPreviewLen) { $plainRight = $plainRight.PadRight($rightPreviewLen) }
+                $plainRight = Get-PlainSubstring $FrameLines[$i] $rightCol $rightPreviewLen
+                if ($plainRight.Length -lt $rightPreviewLen) {
+                    $plainRight = $plainRight.PadRight($rightPreviewLen)
+                }
+                # Fully dim preview text to the right of modal box
                 $rightPreview = $dimStyle + $plainRight + $rst
             }
 
             $rightBorder = $dimStyle + $bVert + $rst
-            $outLines.Add($leftBg + $shadowSegment + $rightPreview + $rightBorder)
+
+            $outLines.Add($leftBg + $modalStr + $rightPreview + $rightBorder)
         } else {
-            # Fully dim all background rows outside modal box height and shadow
+            # Fully dim all background rows outside modal box height
             $plainLine = Get-PlainSubstring $FrameLines[$i] 0 $TermWidth
             if ($plainLine.Length -lt $TermWidth) {
                 $plainLine = $plainLine.PadRight($TermWidth)

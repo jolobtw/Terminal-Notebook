@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.8
+**Date:** 2026-10-03
+
+### Clean Backdrop Modal Overlay
+- **Clean Dimmed Backdrop:** Removed popup drop shadow offset rows from `Overlay-ModalOnFrame`, returning to a clean, crisp dimmed backdrop (`$cDarkGray + $sFaint`) for active modal dialogs.
+
 ## Version 3.3.7
 **Date:** 2026-10-03
 
