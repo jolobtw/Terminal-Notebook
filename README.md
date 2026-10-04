@@ -23,6 +23,9 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 
 ### ⚡ Seamless Editing Workflows
 * **Split-Pane Editing (Windows Terminal):** Creating or editing a note automatically splits your terminal side-by-side so your folder tree stays visible.
+
+![Split-Pane Editing](docs/split_view.png)
+
 * **Editor Auto-Discovery:** Detects and launches your preferred terminal editor (`hx`, `micro`, `nvim`, `vim`, or `nano`).
 * **Quick Logging:** Append passing thoughts directly to today's daily log straight from your terminal (`note "My quick thought"`).
 
