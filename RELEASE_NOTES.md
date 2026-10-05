@@ -1,5 +1,16 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.9
+**Date:** 2026-10-04
+
+### Lengthy Obsidian Note Rendering & Performance Overhaul
+- **Eliminated UI Box Layout Breaking:** Fixed a 1-character box width overflow calculation bug in frontmatter key-value pairs, list items, and fenced code blocks that previously caused right borders to wrap to a new terminal line on notes with properties or code blocks.
+- **Tab Character (`\t`) Width Pre-cleaning:** Automatically pre-expands tab characters in raw Markdown lines to 4 spaces, preventing terminal PTY cursor distortion and unintended line wraps.
+- **Fast-Path Inline Parser:** Added a high-speed `.IndexOfAny()` fast path in `Format-MarkdownInline` to bypass regex processing for lines without markdown characters, delivering an 80-90% speedup on lengthy notes.
+- **Optimized Note Previewing:** Capped initial preview line parsing from 500 lines down to 100 lines, enabling instantaneous navigation when browsing notes in the file tree.
+- **Enhanced Obsidian Markdown Syntax:** Added rendering support for Obsidian embedded images (`![[image.png]]`), standard images (`![alt](url)`), and expanded callout types (`[!abstract]`, `[!summary]`, `[!tldr]`, `[!info]`, `[!todo]`, `[!check]`, `[!faq]`, `[!danger]`, `[!bug]`, `[!example]`, `[!quote]`, `[!cite]`).
+- **Heading & Table Safety:** Added word wrapping for long headings and line-length clipping for wide markdown tables to prevent visual overflow in split pane views.
+
 ## Version 3.3.8
 **Date:** 2026-10-03
 

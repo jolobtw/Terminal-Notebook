@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.8"
+$AppVersion = "3.3.9"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1103,6 +1103,7 @@ function Format-WordWrap {
     )
 
     if ([string]::IsNullOrEmpty($Text)) { return @("") }
+    if ($Text.Contains("`t")) { $Text = $Text.Replace("`t", "    ") }
     if ($Text.Length -le $Width) { return @($Text) }
 
     $wrappedLines = [System.Collections.Generic.List[string]]::new()
@@ -1136,6 +1137,11 @@ function Format-MarkdownInline {
     param([string]$Text)
     if ([string]::IsNullOrEmpty($Text)) { return "" }
 
+    # Fast path: if string contains no markdown trigger characters, skip regex processing
+    if ($Text.IndexOfAny(@([char]'`', [char]'[', [char]'*', [char]'~', [char]'=', [char]'!')) -lt 0) {
+        return $Text
+    }
+
     # 1. Inline code: `code` - swapped for placeholders first so no other rule touches code contents
     $codeSpans = [System.Collections.Generic.List[string]]::new()
     $res = [regex]::Replace($Text, '`([^`]+)`', {
@@ -1144,38 +1150,51 @@ function Format-MarkdownInline {
         return "$([char]1)$($codeSpans.Count - 1)$([char]1)"
     })
 
-    # 2. Obsidian WikiLinks: [[Target]] or [[Target|Label]]
+    # 2. Obsidian Embedded Images: ![[image.png]] or ![[image.png|300]]
+    $res = [regex]::Replace($res, '!\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]', {
+        param($m)
+        return "$cAmber[Image: $cOrange$($m.Groups[1].Value)$cAmber]$rst$cSilver"
+    })
+
+    # 3. Standard Markdown Images: ![alt](url)
+    $res = [regex]::Replace($res, '!\[([^\]]*)\]\(([^)]+)\)', {
+        param($m)
+        $alt = if ($m.Groups[1].Value) { $m.Groups[1].Value } else { "Image" }
+        return "$cAmber[Image: $cOrange$alt$cAmber]$rst$cSilver"
+    })
+
+    # 4. Obsidian WikiLinks: [[Target]] or [[Target|Label]] or [[Target#Section|Label]]
     $res = [regex]::Replace($res, '\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]', {
         param($m)
         $label = if ($m.Groups[2].Success -and -not [string]::IsNullOrEmpty($m.Groups[2].Value)) { $m.Groups[2].Value } else { $m.Groups[1].Value }
         return "$cAmber[[$cOrange$label$cAmber]]$rst$cSilver"
     })
 
-    # 3. Standard Markdown Links: [Label](url)
+    # 5. Standard Markdown Links: [Label](url)
     $res = [regex]::Replace($res, '\[([^\]]+)\]\(([^)]+)\)', {
         param($m)
         return "$cOrange$($m.Groups[1].Value)$cDarkGray$uArrowUpR$rst$cSilver"
     })
 
-    # 4. Bold: **text** or __text__ (underscores must not be inside a word, e.g. snake__case)
+    # 6. Bold: **text** or __text__ (underscores must not be inside a word, e.g. snake__case)
     $res = [regex]::Replace($res, '\*\*(?<b>.+?)\*\*|(?<!\w)__(?<b>.+?)__(?!\w)', {
         param($m)
         return "$cWhite$sBold$($m.Groups['b'].Value)$sNoBold$cSilver"
     })
 
-    # 5. Obsidian Highlight: ==text==
+    # 7. Obsidian Highlight: ==text==
     $res = [regex]::Replace($res, '==(.*?)==', {
         param($m)
         return "$cHighlightBg$cOrange $($m.Groups[1].Value) $rst$cSilver"
     })
 
-    # 6. Italic: *text*
+    # 8. Italic: *text*
     $res = [regex]::Replace($res, '(?<!\*)\*([^\*]+)\*(?!\*)', {
         param($m)
         return "$sItalic$($m.Groups[1].Value)$sNoItalic"
     })
 
-    # 7. Strikethrough: ~~text~~
+    # 9. Strikethrough: ~~text~~
     $res = [regex]::Replace($res, '~~(.*?)~~', {
         param($m)
         return "$cGray$sStrike$($m.Groups[1].Value)$sNoStrike$cSilver"
@@ -1199,6 +1218,13 @@ function Convert-MarkdownToTerminalLines {
     )
 
     if (-not $RawLines -or $RawLines.Count -eq 0) { return @() }
+
+    # Pre-clean raw lines: replace tab characters with 4 spaces to prevent PTY width distortion
+    for ($lIdx = 0; $lIdx -lt $RawLines.Count; $lIdx++) {
+        if ($RawLines[$lIdx] -and $RawLines[$lIdx].Contains("`t")) {
+            $RawLines[$lIdx] = $RawLines[$lIdx].Replace("`t", "    ")
+        }
+    }
 
     $out = [System.Collections.Generic.List[string]]::new()
     $boxW = [Math]::Max(20, $Width - 2)
@@ -1237,14 +1263,20 @@ function Convert-MarkdownToTerminalLines {
                 if ($fl -match '^\s*([A-Za-z0-9_-]+)\s*:\s*(.*)') {
                     $keyPad = "{0,-8}" -f $matches[1]
                     $valDisp = $matches[2].Trim('"', "'", ' ')
-                    if ($valDisp.Length -gt ($boxW - 14)) { $valDisp = $valDisp.Substring(0, $boxW - 17) + "..." }
-                    $pad = " " * [Math]::Max(0, $boxW - 2 - (11 + $valDisp.Length))
-                    $out.Add(" " + $barLeft + " " + $cGray + $keyPad + $cDarkGray + ": " + $cWhite + (Format-MarkdownInline $valDisp) + $pad + $barRight)
+                    $maxValLen = [Math]::Max(1, $boxW - 14)
+                    if ($valDisp.Length -gt $maxValLen) { $valDisp = Truncate-String $valDisp $maxValLen }
+                    $formattedVal = Format-MarkdownInline $valDisp
+                    $visLen = ($AnsiRegex.Replace($formattedVal, '')).Length
+                    $pad = " " * [Math]::Max(0, $boxW - 14 - $visLen)
+                    $out.Add(" " + $barLeft + " " + $cGray + $keyPad + $cDarkGray + ": " + $cWhite + $formattedVal + $pad + $barRight)
                 } elseif ($fl -match '^\s*-\s+(.*)') {
                     $itemText = $matches[1]
-                    if ($itemText.Length -gt ($boxW - 11)) { $itemText = $itemText.Substring(0, $boxW - 14) + "..." }
-                    $pad = " " * [Math]::Max(0, $boxW - 2 - (5 + $itemText.Length))
-                    $out.Add(" " + $barLeft + "   " + $cAmber + "$uBullet " + $cSilver + (Format-MarkdownInline $itemText) + $pad + $barRight)
+                    $maxItemLen = [Math]::Max(1, $boxW - 8)
+                    if ($itemText.Length -gt $maxItemLen) { $itemText = Truncate-String $itemText $maxItemLen }
+                    $formattedItem = Format-MarkdownInline $itemText
+                    $visLen = ($AnsiRegex.Replace($formattedItem, '')).Length
+                    $pad = " " * [Math]::Max(0, $boxW - 8 - $visLen)
+                    $out.Add(" " + $barLeft + "   " + $cAmber + "$uBullet " + $cSilver + $formattedItem + $pad + $barRight)
                 }
             }
 
@@ -1271,21 +1303,23 @@ function Convert-MarkdownToTerminalLines {
 
         if ($inCodeBlock) {
             $codeStr = $line
-            if ($codeStr.Length -gt ($boxW - 4)) { $codeStr = $codeStr.Substring(0, $boxW - 4) }
-            $pad = " " * [Math]::Max(0, $boxW - 4 - $codeStr.Length)
+            $maxCodeLen = [Math]::Max(1, $boxW - 5)
+            if ($codeStr.Length -gt $maxCodeLen) { $codeStr = $codeStr.Substring(0, $maxCodeLen) }
+            $pad = " " * [Math]::Max(0, $boxW - 5 - $codeStr.Length)
             $out.Add(" " + $barLeft + " " + $cAmber + $codeStr + $pad + " " + $barRight)
             continue
         }
 
-        # Obsidian Callouts: > [!NOTE] or > [!TIP]
+        # Obsidian Callouts: > [!NOTE] or > [!TIP] etc.
         if ($line -match '^\s*>\s*\[!([A-Za-z0-9_-]+)\]\s*(.*)') {
             $cType = $matches[1].ToUpper()
             $cTitle = $matches[2]
             $activeCalloutColor = switch ($cType) {
-                { $_ -in @("TIP", "HINT", "SUCCESS", "DONE") }      { $cAmber }
-                { $_ -in @("WARNING", "CAUTION", "DANGER", "BUG") } { $cWarn }
-                { $_ -in @("TODO", "QUESTION", "HELP") }            { $cSilver }
-                default                                             { $cOrange }
+                { $_ -in @("TIP", "HINT", "SUCCESS", "DONE", "CHECK") }                        { $cAmber }
+                { $_ -in @("WARNING", "CAUTION", "ATTENTION", "DANGER", "ERROR", "BUG", "FAIL", "FAILURE", "MISSING") } { $cWarn }
+                { $_ -in @("TODO", "QUESTION", "HELP", "FAQ") }                               { $cSilver }
+                { $_ -in @("ABSTRACT", "SUMMARY", "TLDR", "INFO", "NOTE") }                   { $cFolder }
+                default                                                                        { $cOrange }
             }
             $hdr = if ($cTitle) { "$cType - $cTitle" } else { $cType }
             $out.Add(" " + $activeCalloutColor + "$uBar " + $cWhite + $sBold + $hdr + $sNoBold + $rst)
@@ -1319,24 +1353,24 @@ function Convert-MarkdownToTerminalLines {
         # Headings (# through ####)
         if ($line -match '^(#{1,4})\s+(.*)') {
             $hLevel = $matches[1].Length
-            $hText = Format-MarkdownInline $matches[2]
+            $hText = $matches[2]
             switch ($hLevel) {
                 1 {
                     Add-BlankLine
-                    $out.Add(" " + $cOrange + "# " + $cWhite + $sBold + $hText + $sNoBold + $rst)
-                    $divLen = [Math]::Min($Width - 2, [Math]::Max(12, $matches[2].Length + 4))
+                    Add-Wrapped $hText ($Width - 4) (" " + $cOrange + "# " + $cWhite + $sBold) "" "" $sNoBold
+                    $divLen = [Math]::Min($Width - 2, [Math]::Max(12, $hText.Length + 4))
                     $out.Add(" " + (Render-GradientText ($bHoriz * $divLen) $gWaveOrange $gWaveDark))
                 }
                 2 {
                     Add-BlankLine
-                    $out.Add(" " + $cOrange + "## " + $cWhite + $sBold + $hText + $sNoBold + $rst)
+                    Add-Wrapped $hText ($Width - 5) (" " + $cOrange + "## " + $cWhite + $sBold) "" "" $sNoBold
                 }
                 3 {
                     Add-BlankLine
-                    $out.Add(" " + $cAmber + "### " + $cSilver + $sBold + $hText + $sNoBold + $rst)
+                    Add-Wrapped $hText ($Width - 6) (" " + $cAmber + "### " + $cSilver + $sBold) "" "" $sNoBold
                 }
                 4 {
-                    $out.Add(" " + $cGray + "#### " + $cSilver + $hText + $rst)
+                    Add-Wrapped $hText ($Width - 7) (" " + $cGray + "#### " + $cSilver) ""
                 }
             }
             continue
@@ -1350,7 +1384,11 @@ function Convert-MarkdownToTerminalLines {
                 $out.Add(" " + (Render-GradientText ($uMidLeft + ($bHoriz * $midLen) + $uMidRight) $gWaveOrange $gWaveDark))
             } else {
                 $cells = foreach ($cell in ($inner -split '\|')) { Format-MarkdownInline $cell.Trim() }
-                $out.Add(" " + $barLeft + " " + ($cells -join (" " + $barLeft + " ")) + " " + $barRight)
+                $rowStr = " " + $barLeft + " " + ($cells -join (" " + $barLeft + " ")) + " " + $barRight
+                if (($AnsiRegex.Replace($rowStr, '')).Length -gt ($Width - 2)) {
+                    $rowStr = Limit-AnsiText $rowStr ($Width - 2)
+                }
+                $out.Add($rowStr)
             }
             continue
         }
@@ -2277,7 +2315,7 @@ function Start-NotebookBrowser {
                 if ($activeItem -and $activeItem.Type -eq "Folder") {
                     $previewLines = @(Get-FolderPreviewLines -Item $activeItem -Index $index -UsableWidth $usableWidth)
                 } elseif ($activeItem -and $activeItem.Type -eq "Note" -and $stamp) {
-                    $rawLines = Get-Content -LiteralPath $activeItem.FullName -TotalCount 500 -Encoding UTF8 -ErrorAction SilentlyContinue
+                    $rawLines = Get-Content -LiteralPath $activeItem.FullName -TotalCount 100 -Encoding UTF8 -ErrorAction SilentlyContinue
                     $previewLines = @(Convert-MarkdownToTerminalLines -RawLines $rawLines -Width $usableWidth)
                 }
                 $previewKey = $newPreviewKey
