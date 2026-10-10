@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.11
+**Date:** 2026-10-09
+
+### Pixel-Perfect Card Right Border Math Alignment
+- **Pixel-Perfect Box Borders:** Corrected a 1-space offset calculation in `Convert-MarkdownToTerminalLines` (`note.ps1`) for frontmatter properties cards and fenced code blocks. Total visible row length now matches `New-BoxTop` and `New-BoxBottom` (`$boxW + 1` columns), aligning the right-side border (`│`) with top and bottom corners.
+
 ## Version 3.3.10
 **Date:** 2026-10-09
 

@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.10"
+$AppVersion = "3.3.11"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1269,13 +1269,13 @@ function Convert-MarkdownToTerminalLines {
                     $keyDisp = if ($rawKey.Length -lt 8) { $rawKey.PadRight(8) } else { $rawKey }
                     $keyLen = $keyDisp.Length
 
-                    $maxKeyLen = [Math]::Max(4, $boxW - 10)
+                    $maxKeyLen = [Math]::Max(4, $boxW - 9)
                     if ($keyLen -gt $maxKeyLen) {
                         $keyDisp = Truncate-String $rawKey $maxKeyLen
                         $keyLen = $keyDisp.Length
                     }
 
-                    $maxValLen = [Math]::Max(1, $boxW - 6 - $keyLen)
+                    $maxValLen = [Math]::Max(1, $boxW - 5 - $keyLen)
                     $valDisp = $rawVal
                     if ($valDisp.Length -gt $maxValLen) { $valDisp = Truncate-String $valDisp $maxValLen }
 
@@ -1287,14 +1287,14 @@ function Convert-MarkdownToTerminalLines {
                         $visLen = ($AnsiRegex.Replace($formattedVal, '')).Length
                     }
 
-                    $padLen = [Math]::Max(0, $boxW - 6 - $keyLen - $visLen)
+                    $padLen = [Math]::Max(0, $boxW - 5 - $keyLen - $visLen)
                     $pad = " " * $padLen
 
                     $out.Add(" " + $barLeft + " " + $cGray + $keyDisp + $cDarkGray + ": " + $cWhite + $formattedVal + $pad + $barRight)
 
                 } elseif ($fl -match '^\s*-\s+(.*)') {
                     $itemText = $matches[1]
-                    $maxItemLen = [Math]::Max(1, $boxW - 8)
+                    $maxItemLen = [Math]::Max(1, $boxW - 7)
                     if ($itemText.Length -gt $maxItemLen) { $itemText = Truncate-String $itemText $maxItemLen }
                     $formattedItem = Format-MarkdownInline $itemText
                     $visLen = ($AnsiRegex.Replace($formattedItem, '')).Length
@@ -1304,13 +1304,13 @@ function Convert-MarkdownToTerminalLines {
                         $visLen = ($AnsiRegex.Replace($formattedItem, '')).Length
                     }
 
-                    $padLen = [Math]::Max(0, $boxW - 8 - $visLen)
+                    $padLen = [Math]::Max(0, $boxW - 7 - $visLen)
                     $pad = " " * $padLen
                     $out.Add(" " + $barLeft + "   " + $cAmber + "$uBullet " + $cSilver + $formattedItem + $pad + $barRight)
 
                 } else {
                     $txt = $fl.Trim()
-                    $maxTxtLen = [Math]::Max(1, $boxW - 4)
+                    $maxTxtLen = [Math]::Max(1, $boxW - 3)
                     if ($txt.Length -gt $maxTxtLen) { $txt = Truncate-String $txt $maxTxtLen }
                     $formattedTxt = Format-MarkdownInline $txt
                     $visLen = ($AnsiRegex.Replace($formattedTxt, '')).Length
@@ -1320,7 +1320,7 @@ function Convert-MarkdownToTerminalLines {
                         $visLen = ($AnsiRegex.Replace($formattedTxt, '')).Length
                     }
 
-                    $padLen = [Math]::Max(0, $boxW - 4 - $visLen)
+                    $padLen = [Math]::Max(0, $boxW - 3 - $visLen)
                     $pad = " " * $padLen
                     $out.Add(" " + $barLeft + " " + $cGray + $formattedTxt + $pad + $barRight)
                 }
@@ -1349,9 +1349,9 @@ function Convert-MarkdownToTerminalLines {
 
         if ($inCodeBlock) {
             $codeStr = $line
-            $maxCodeLen = [Math]::Max(1, $boxW - 5)
+            $maxCodeLen = [Math]::Max(1, $boxW - 4)
             if ($codeStr.Length -gt $maxCodeLen) { $codeStr = $codeStr.Substring(0, $maxCodeLen) }
-            $pad = " " * [Math]::Max(0, $boxW - 5 - $codeStr.Length)
+            $pad = " " * [Math]::Max(0, $boxW - 4 - $codeStr.Length)
             $out.Add(" " + $barLeft + " " + $cAmber + $codeStr + $pad + " " + $barRight)
             continue
         }
