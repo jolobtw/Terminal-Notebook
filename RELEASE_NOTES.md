@@ -1,5 +1,11 @@
 # Terminal Notebook Release Notes
 
+## Version 3.3.10
+**Date:** 2026-10-09
+
+### Note Preview Properties Section Right Border Fix
+- **Dynamic Property Key Alignment:** Fixed the Properties / Frontmatter card rendering logic in `note.ps1` (`Convert-MarkdownToTerminalLines`) to dynamically calculate column widths based on exact property key lengths (e.g., long keys like `description`, `last_modified`, or `categories`), preventing right-side border wrapping and visual breakage.
+
 ## Version 3.3.9
 **Date:** 2026-10-04
 

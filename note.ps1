@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.9"
+$AppVersion = "3.3.10"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -1260,23 +1260,69 @@ function Convert-MarkdownToTerminalLines {
             $out.Add((New-BoxTop " Properties " $boxW))
 
             foreach ($fl in $frontmatter) {
+                if ([string]::IsNullOrWhiteSpace($fl)) { continue }
+
                 if ($fl -match '^\s*([A-Za-z0-9_-]+)\s*:\s*(.*)') {
-                    $keyPad = "{0,-8}" -f $matches[1]
-                    $valDisp = $matches[2].Trim('"', "'", ' ')
-                    $maxValLen = [Math]::Max(1, $boxW - 14)
+                    $rawKey = $matches[1]
+                    $rawVal = $matches[2].Trim('"', "'", ' ')
+
+                    $keyDisp = if ($rawKey.Length -lt 8) { $rawKey.PadRight(8) } else { $rawKey }
+                    $keyLen = $keyDisp.Length
+
+                    $maxKeyLen = [Math]::Max(4, $boxW - 10)
+                    if ($keyLen -gt $maxKeyLen) {
+                        $keyDisp = Truncate-String $rawKey $maxKeyLen
+                        $keyLen = $keyDisp.Length
+                    }
+
+                    $maxValLen = [Math]::Max(1, $boxW - 6 - $keyLen)
+                    $valDisp = $rawVal
                     if ($valDisp.Length -gt $maxValLen) { $valDisp = Truncate-String $valDisp $maxValLen }
+
                     $formattedVal = Format-MarkdownInline $valDisp
                     $visLen = ($AnsiRegex.Replace($formattedVal, '')).Length
-                    $pad = " " * [Math]::Max(0, $boxW - 14 - $visLen)
-                    $out.Add(" " + $barLeft + " " + $cGray + $keyPad + $cDarkGray + ": " + $cWhite + $formattedVal + $pad + $barRight)
+
+                    if ($visLen -gt $maxValLen) {
+                        $formattedVal = Limit-AnsiText $formattedVal $maxValLen
+                        $visLen = ($AnsiRegex.Replace($formattedVal, '')).Length
+                    }
+
+                    $padLen = [Math]::Max(0, $boxW - 6 - $keyLen - $visLen)
+                    $pad = " " * $padLen
+
+                    $out.Add(" " + $barLeft + " " + $cGray + $keyDisp + $cDarkGray + ": " + $cWhite + $formattedVal + $pad + $barRight)
+
                 } elseif ($fl -match '^\s*-\s+(.*)') {
                     $itemText = $matches[1]
                     $maxItemLen = [Math]::Max(1, $boxW - 8)
                     if ($itemText.Length -gt $maxItemLen) { $itemText = Truncate-String $itemText $maxItemLen }
                     $formattedItem = Format-MarkdownInline $itemText
                     $visLen = ($AnsiRegex.Replace($formattedItem, '')).Length
-                    $pad = " " * [Math]::Max(0, $boxW - 8 - $visLen)
+
+                    if ($visLen -gt $maxItemLen) {
+                        $formattedItem = Limit-AnsiText $formattedItem $maxItemLen
+                        $visLen = ($AnsiRegex.Replace($formattedItem, '')).Length
+                    }
+
+                    $padLen = [Math]::Max(0, $boxW - 8 - $visLen)
+                    $pad = " " * $padLen
                     $out.Add(" " + $barLeft + "   " + $cAmber + "$uBullet " + $cSilver + $formattedItem + $pad + $barRight)
+
+                } else {
+                    $txt = $fl.Trim()
+                    $maxTxtLen = [Math]::Max(1, $boxW - 4)
+                    if ($txt.Length -gt $maxTxtLen) { $txt = Truncate-String $txt $maxTxtLen }
+                    $formattedTxt = Format-MarkdownInline $txt
+                    $visLen = ($AnsiRegex.Replace($formattedTxt, '')).Length
+
+                    if ($visLen -gt $maxTxtLen) {
+                        $formattedTxt = Limit-AnsiText $formattedTxt $maxTxtLen
+                        $visLen = ($AnsiRegex.Replace($formattedTxt, '')).Length
+                    }
+
+                    $padLen = [Math]::Max(0, $boxW - 4 - $visLen)
+                    $pad = " " * $padLen
+                    $out.Add(" " + $barLeft + " " + $cGray + $formattedTxt + $pad + $barRight)
                 }
             }
 
