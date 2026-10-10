@@ -26,7 +26,7 @@ A blazingly fast, highly-aesthetic terminal-based notebook for browsing, writing
 
 ![Split-Pane Editing](docs/split_view.png)
 
-* **Editor Auto-Discovery:** Detects and launches your preferred terminal editor (`hx`, `micro`, `nvim`, `vim`, or `nano`).
+* **Editor Auto-Discovery & Neovim Integration:** Detects and launches your preferred terminal editor (`nvim`, `hx`, `micro`, `vim`, or `nano`). Neovim is automatically pre-configured with Windows shortcuts (`Ctrl+C`, `Ctrl+X`, `Ctrl+V`, `Ctrl+A`, `Ctrl+S`, `Ctrl+Z`, `Ctrl+Y`, `Shift+Arrow` selection) and a custom Flame-Orange theme.
 * **Quick Logging:** Append passing thoughts directly to today's daily log straight from your terminal (`note "My quick thought"`).
 
 ### 📚 Multi-Notebook Workspaces

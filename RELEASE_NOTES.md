@@ -1,5 +1,14 @@
 # Terminal Notebook Release Notes
 
+## Version 3.4.0
+**Date:** 2026-10-10
+
+### Neovim Integration & Windows Word-Processor Shortcuts
+- **Automated Neovim Lua Configuration (`Ensure-TerminalNotebookNvimConfig`):** Added auto-generation of custom Lua settings (`.terminal_notebook_nvim.lua`) when editing notes with Neovim (`nvim`).
+- **Standard Windows Copy / Cut / Paste:** Mapped `Ctrl+C` (Copy), `Ctrl+X` (Cut), and `Ctrl+V` (Paste) across Normal, Visual, and Insert modes connected directly to the Windows system clipboard (`clipboard = 'unnamedplus'`).
+- **Word-Processor Ergonomics:** Added `Ctrl+A` (Select All), `Ctrl+S` (Save file), `Ctrl+Z` (Undo), `Ctrl+Y` (Redo), `Shift + Arrow Keys` (intuitive text highlighting in Normal, Visual, and Insert modes), `Ctrl + Left/Right` (word jump), and `Home` / `End` / `Shift+Home` / `Shift+End` mappings.
+- **Flame-Orange Theme Palette:** Applied Terminal Notebook's Slate Graphite and Flame-Orange color scheme to Neovim UI, cursor lines, visual highlights, and statusline.
+
 ## Version 3.3.11
 **Date:** 2026-10-09
 

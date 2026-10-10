@@ -20,7 +20,7 @@ param(
     [string]$Notebook
 )
 
-$AppVersion = "3.3.11"
+$AppVersion = "3.4.0"
 
 # Disable progress bar rendering to prevent terminal title bar flickering from Start-Sleep
 $ProgressPreference = 'SilentlyContinue'
@@ -975,6 +975,156 @@ function ConvertTo-WtArg([string]$Arg, [switch]$AlwaysQuote) {
     return $a
 }
 
+function Ensure-TerminalNotebookNvimConfig {
+    $cfgPath = Join-Path $HOME ".terminal_notebook_nvim.lua"
+
+    $nvimDir = Join-Path $HOME "AppData\Local\nvim"
+    $userInit = Join-Path $nvimDir "init.lua"
+
+    $luaContent = @"
+-- Terminal Notebook Custom Neovim Configuration with Windows Shortcuts
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
+
+vim.opt.number = true
+vim.opt.relativenumber = false
+vim.opt.cursorline = true
+vim.opt.wrap = true
+vim.opt.linebreak = true
+vim.opt.scrolloff = 8
+vim.opt.sidescrolloff = 8
+vim.opt.mouse = 'a'
+vim.opt.clipboard = 'unnamedplus'
+vim.opt.termguicolors = true
+vim.opt.conceallevel = 2
+vim.opt.ignorecase = true
+vim.opt.smartcase = true
+vim.opt.expandtab = true
+vim.opt.tabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.updatetime = 250
+
+-- Dark Slate Graphite & Flame-Orange Palette
+vim.cmd([[
+  highlight Normal guifg=#D8DCE6 guibg=#1B1D24
+  highlight NormalNC guifg=#D8DCE6 guibg=#1B1D24
+  highlight CursorLine guibg=#282B36
+  highlight CursorLineNr guifg=#FF8200 gui=bold
+  highlight LineNr guifg=#5F6473
+  highlight StatusLine guifg=#FF8200 guibg=#242733 gui=bold
+  highlight StatusLineNC guifg=#9B9FAD guibg=#1E202A
+  highlight Visual guifg=#000000 guibg=#FF8200
+  highlight Search guifg=#000000 guibg=#FFB923
+  highlight IncSearch guifg=#000000 guibg=#FF8200
+  highlight Title guifg=#FF8200 gui=bold
+  highlight Heading1 guifg=#FF8200 gui=bold
+  highlight Heading2 guifg=#FFB923 gui=bold
+  highlight Comment guifg=#8A90A0 gui=italic
+  highlight String guifg=#FFB923
+  highlight Keyword guifg=#FF8200 gui=bold
+  highlight Special guifg=#FF8200
+]])
+
+-- Statusline displaying note file name, word count, and position
+function _G.terminal_notebook_statusline()
+  local file = vim.fn.expand('%:t')
+  if file == '' then file = '[No Name]' end
+  local wc = vim.fn.wordcount().words or 0
+  local line = vim.fn.line('.')
+  local col = vim.fn.col('.')
+  local total = vim.fn.line('$')
+  return string.format(" 📖 %s  |  📝 %d words  |  Ln %d/%d, Col %d ", file, wc, line, total, col)
+end
+vim.opt.statusline = "%!v:lua.terminal_notebook_statusline()"
+
+local opts = { noremap = true, silent = true }
+local map = vim.keymap.set
+
+-- Copy (Ctrl+C)
+map('v', '<C-c>', '"+y', opts)
+map('n', '<C-c>', '"+yy', opts)
+
+-- Cut (Ctrl+X)
+map('v', '<C-x>', '"+d', opts)
+map('n', '<C-x>', '"+dd', opts)
+
+-- Paste (Ctrl+V)
+map('n', '<C-v>', '"+p', opts)
+map('v', '<C-v>', '"+p', opts)
+map('i', '<C-v>', '<C-r>+', opts)
+
+-- Select All (Ctrl+A)
+map('n', '<C-a>', 'ggVG', opts)
+map('v', '<C-a>', '<Esc>ggVG', opts)
+map('i', '<C-a>', '<Esc>ggVG', opts)
+
+-- Save (Ctrl+S)
+map('n', '<C-s>', ':w<CR>', opts)
+map('v', '<C-s>', '<Esc>:w<CR>gv', opts)
+map('i', '<C-s>', '<Esc>:w<CR>gi', opts)
+
+-- Undo (Ctrl+Z)
+map('n', '<C-z>', 'u', opts)
+map('v', '<C-z>', '<Esc>u', opts)
+map('i', '<C-z>', '<C-o>u', opts)
+
+-- Redo (Ctrl+Y)
+map('n', '<C-y>', '<C-r>', opts)
+map('v', '<C-y>', '<Esc><C-r>', opts)
+map('i', '<C-y>', '<C-o><C-r>', opts)
+
+-- Shift + Arrow Key Selection
+map('n', '<S-Left>', 'v<Left>', opts)
+map('n', '<S-Right>', 'v<Right>', opts)
+map('n', '<S-Up>', 'V<Up>', opts)
+map('n', '<S-Down>', 'V<Down>', opts)
+
+map('i', '<S-Left>', '<Esc>v<Left>', opts)
+map('i', '<S-Right>', '<Esc>v<Right>', opts)
+map('i', '<S-Up>', '<Esc>V<Up>', opts)
+map('i', '<S-Down>', '<Esc>V<Down>', opts)
+
+map('v', '<S-Left>', '<Left>', opts)
+map('v', '<S-Right>', '<Right>', opts)
+map('v', '<S-Up>', '<Up>', opts)
+map('v', '<S-Down>', '<Down>', opts)
+
+-- Ctrl + Arrow Word Navigation
+map('n', '<C-Left>', 'b', opts)
+map('n', '<C-Right>', 'w', opts)
+map('i', '<C-Left>', '<C-o>b', opts)
+map('i', '<C-Right>', '<C-o>w', opts)
+map('v', '<C-Left>', 'b', opts)
+map('v', '<C-Right>', 'w', opts)
+
+-- Home & End Keys
+map('n', '<Home>', '^', opts)
+map('n', '<End>', '$', opts)
+map('i', '<Home>', '<C-o>^', opts)
+map('i', '<End>', '<C-o>$', opts)
+map('v', '<Home>', '^', opts)
+map('v', '<End>', '$', opts)
+
+map('n', '<S-Home>', 'v^', opts)
+map('n', '<S-End>', 'v$', opts)
+map('i', '<S-Home>', '<Esc>v^', opts)
+map('i', '<S-End>', '<Esc>v$', opts)
+map('v', '<S-Home>', '^', opts)
+map('v', '<S-End>', '$', opts)
+"@
+
+    Write-Utf8File -Path $cfgPath -Text $luaContent
+
+    if (-not (Test-Path -LiteralPath $nvimDir)) {
+        try { New-Item -ItemType Directory -Path $nvimDir -Force | Out-Null } catch {}
+    }
+    if (Test-Path -LiteralPath $nvimDir -and -not (Test-Path -LiteralPath $userInit)) {
+        try { Copy-Item -LiteralPath $cfgPath -Destination $userInit -Force -ErrorAction SilentlyContinue } catch {}
+    }
+
+    return $cfgPath
+}
+
 function Invoke-TerminalEditor {
     param(
         [string]$EditorPath,
@@ -994,6 +1144,11 @@ function Invoke-TerminalEditor {
     if ($edLeaf -match 'micro') {
         $edArgs += @("-colorscheme", "simple", "-softwrap", "true", "-wordwrap", "true", $FilePath)
         if ($GoToEnd) { $edArgs += "+$lastLine" }
+    } elseif ($edLeaf -match 'nvim') {
+        $nvimCfg = Ensure-TerminalNotebookNvimConfig
+        $edArgs += @("-u", $nvimCfg)
+        if ($GoToEnd) { $edArgs += "+$lastLine" }
+        $edArgs += $FilePath
     } else {
         if ($GoToEnd -and $edLeaf -match 'hx|vim|nano') { $edArgs += "+$lastLine" }
         $edArgs += $FilePath
